@@ -83,7 +83,7 @@ begin
   mContextAnalysis[0] := TSJISContextAnalysis.Create;
 
   AddCharsetModel(EUCJPLangModel);
-  mDistributionAnalysis[1] := TEUCKRDistributionAnalysis.Create;
+  mDistributionAnalysis[1] := TEUCJPDistributionAnalysis.Create;
   mContextAnalysis[1] := nil;
 
   AddCharsetModel(GB18030LangModel);
