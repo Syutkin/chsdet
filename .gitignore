@@ -1,0 +1,5 @@
+*.o
+*.ppu
+/lib/
+/tests/.test_build/
+/tests/work/
