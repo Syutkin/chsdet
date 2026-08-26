@@ -5,7 +5,7 @@ Given input buffer will be analysed to guess used encoding. The result can be us
 Based on Mozilla's i18n component - https://dxr.mozilla.org/mozilla/source/extensions/universalchardet/.
 
 -----------State
-Version 0.2.9 stable.
+Version 0.2.10 stable.
 Copyright (C) 2011-2019 Alexander Koblov
 The latest version can be found at https://github.com/doublecmd/doublecmd/tree/master/components/chsdet/.
 

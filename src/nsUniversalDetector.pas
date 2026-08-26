@@ -86,7 +86,7 @@ const
   AboutInfo: rAboutHolder = (
     MajorVersionNr: 0;
     MinorVersionNr: 2;
-    BuildVersionNr: 8;
+    BuildVersionNr: 10;
     About: 'Charset Detector Library. Copyright (C) 2006 - 2013, Nick Yakowlew. http://chsdet.sourceforge.net';
   );
   { TnsUniversalDetector }
@@ -381,4 +381,3 @@ begin
 end;
 
 end.
-

@@ -30,10 +30,14 @@ uses
 	CharDistribution;
 
 type
+	TLastChar = array [0..1] of AnsiChar;
+
 	TnsMBCSMultiProber = class (TMultiModelProber)
     private
       mDistributionAnalysis: array of TCharDistributionAnalysis;
       mContextAnalysis: array of TJapaneseContextAnalysis;
+      mLastChar: array of TLastChar;
+      mKeepNext: Byte;
       mBestGuess: integer;
 
       function RunStatAnalyse(aBuf: pAnsiChar; aLen: integer): eProbingState;
@@ -77,6 +81,7 @@ begin
   inherited Create;
   SetLength(mDistributionAnalysis, NUM_OF_PROBERS);
   SetLength(mContextAnalysis, NUM_OF_PROBERS);
+  SetLength(mLastChar, NUM_OF_PROBERS);
 
   AddCharsetModel(SJISLangModel);
   mDistributionAnalysis[0] := TSJISDistributionAnalysis.Create;
@@ -84,7 +89,7 @@ begin
 
   AddCharsetModel(EUCJPLangModel);
   mDistributionAnalysis[1] := TEUCJPDistributionAnalysis.Create;
-  mContextAnalysis[1] := nil;
+  mContextAnalysis[1] := TEUCJPContextAnalysis.Create;
 
   AddCharsetModel(GB18030LangModel);
   mDistributionAnalysis[2] := TGB2312DistributionAnalysis.Create;
@@ -119,6 +124,7 @@ begin
 
   SetLength(mDistributionAnalysis, 0);
   SetLength(mContextAnalysis, 0);
+  SetLength(mLastChar, 0);
 
 end;
 
@@ -146,10 +152,7 @@ var
   i: integer; (*do filtering to reduce load to probers*)
   highbyteBuf: pAnsiChar;
   hptr: pAnsiChar;
-  keepNext: Boolean;
 begin
-	keepNext := TRUE;
-  (*assume previous is not ascii, it will do no harm except add some noise*)
   highbyteBuf := AllocMem(aLen);
   try
     hptr:= highbyteBuf;
@@ -160,20 +163,20 @@ begin
       end;
     for i:=0 to Pred(aLen) do
       begin
-        if (Byte(aBuf[i]) > $80) then
+        if (Byte(aBuf[i]) and $80) <> 0 then
           begin
             hptr^ := aBuf[i];
             inc(hptr);
-            keepNext:= TRUE;
+            mKeepNext:= 2;
           end
         else
           begin
             (*if previous is highbyte, keep this even it is a ASCII*)
-            if keepNext = TRUE then
+            if mKeepNext > 0 then
               begin
                 hptr^ := aBuf[i];
                 inc(hptr);
-                keepNext:= FALSE;
+                Dec(mKeepNext);
               end;
           end;
       end;
@@ -181,7 +184,9 @@ begin
      AddDump('MultiByte - HandleData - start');
     {$endif}
 
-    inherited HandleData(highbyteBuf, hptr - highbyteBuf);
+    if (mState <> psFoundIt) and
+       (mState <> psNotMe) then
+      RunStatAnalyse(highbyteBuf, hptr - highbyteBuf);
     {$IFDEF DEBUG_chardet}
      AddDump('MultiByte - HandleData - end');
     {$endif}
@@ -189,11 +194,6 @@ begin
 	  FreeMem(highbyteBuf, aLen);
   end;
 
-  // if we have more when one candidat then
-  // try statisic analyse
-  if (mState <> psFoundIt) or
-     (mState <> psNotMe) then
-    RunStatAnalyse(aBuf, aLen);
 	Result := mState;
 end;
 
@@ -202,7 +202,6 @@ var
   i, c: integer;
   codingState: nsSMState;
   charLen: byte;
-  mLastChar: array [0..1] of AnsiChar;
 begin
   {$IFDEF DEBUG_chardet}
    AddDump('MultiByte - Stat Analyse - start');
@@ -213,20 +212,36 @@ begin
       if (mSMState[i] = psFoundIt) or
          (mSMState[i] = psNotMe) then
         continue;
+      if not mCodingSM[i].Enabled then
+        continue;
       if mDistributionAnalysis[i] = nil then
         continue;
       for c := 0 to Pred(aLen) do
         begin
           codingState := mCodingSM[i].NextState(aBuf[c]);
+          if codingState = eError then
+            begin
+              mSMState[i] := psNotMe;
+              Dec(mActiveSM);
+              break;
+            end;
+          if codingState = eItsMe then
+            begin
+              mSMState[i] := psFoundIt;
+              mState := psFoundIt;
+              mDetectedCharset := mCodingSM[i].GetCharsetID;
+              Result := mState;
+              Exit;
+            end;
           if codingState = eStart then
             begin
               charLen := mCodingSM[i].GetCurrentCharLen;
               if c = 0 then
                 begin
-                  mLastChar[1] := aBuf[0];
+                  mLastChar[i][1] := aBuf[0];
                   if mContextAnalysis[i] <> nil then
-                      mContextAnalysis[i].HandleOneChar(mLastChar,charLen);
-                  mDistributionAnalysis[i].HandleOneChar(mLastChar,charLen);
+                      mContextAnalysis[i].HandleOneChar(@mLastChar[i][0],charLen);
+                  mDistributionAnalysis[i].HandleOneChar(@mLastChar[i][0],charLen);
                 end
               else
                 begin
@@ -239,12 +254,19 @@ begin
              if mContextAnalysis[i].GotEnoughData and
     	         (GetConfidenceFor(i) > SHORTCUT_THRESHOLD) then
             begin
+		        mSMState[i] := psFoundIt;
   		        mState := psFoundIt;
               mDetectedCharset := mCodingSM[i].GetCharsetID;
-              break;
+              Result := mState;
+              Exit;
             end;
         end;
+      if aLen > 0 then
+        mLastChar[i][0] := aBuf[aLen - 1];
     end;
+
+  if mActiveSM = 0 then
+    mState := psNotMe;
 
   {$IFDEF DEBUG_chardet}
    AddDump('MultiByte - Stat Analyse - EXIT');
@@ -304,8 +326,11 @@ var
   i: integer;
 begin
   inherited Reset;
+  mKeepNext := 0;
   for i := 0 to Pred(mCharsetsCount) do
     begin
+      mLastChar[i][0] := #0;
+      mLastChar[i][1] := #0;
       if mDistributionAnalysis[i] <> nil then
         mDistributionAnalysis[i].Reset;
       if mContextAnalysis[i] <> nil then
