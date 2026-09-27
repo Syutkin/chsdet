@@ -28,8 +28,15 @@ uses
 
 type
 	TnsEscCharSetProber = class (TMultiModelProber)
+		private
+      mIso2022CnSequence: array [0..3] of AnsiChar;
+      mIso2022CnSequenceLength: Integer;
+      function IsIso2022CnDesignator: Boolean;
+      function IsIso2022CnEnabled: Boolean;
 		public
     	constructor Create; override;
+      function HandleData(aBuf: pAnsiChar; aLen: integer): eProbingState; override;
+      procedure Reset; override;
       function GetConfidence: float; override;
   end;
 
@@ -58,6 +65,70 @@ begin
   Reset;
 end;
 
+function TnsEscCharSetProber.IsIso2022CnDesignator: Boolean;
+begin
+  Result := False;
+  if (mIso2022CnSequence[0] <> #$1B) or
+     (mIso2022CnSequence[1] <> '$') then
+    Exit;
+
+  case mIso2022CnSequence[2] of
+    ')': Result := mIso2022CnSequence[3] in ['A', 'E', 'G'];
+    '*': Result := mIso2022CnSequence[3] = 'H';
+    '+': Result := mIso2022CnSequence[3] in ['I', 'J', 'K', 'L', 'M'];
+  end;
+end;
+
+function TnsEscCharSetProber.IsIso2022CnEnabled: Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  for i := 0 to Pred(mCharsetsCount) do
+    if mCodingSM[i].GetCharsetID = ISO_2022_CN_CHARSET then
+      begin
+        Result := mCodingSM[i].Enabled;
+        Exit;
+      end;
+end;
+
+function TnsEscCharSetProber.HandleData(aBuf: pAnsiChar;
+  aLen: integer): eProbingState;
+var
+  i: Integer;
+begin
+  for i := 0 to Pred(aLen) do
+    begin
+      if mIso2022CnSequenceLength < Length(mIso2022CnSequence) then
+        begin
+          mIso2022CnSequence[mIso2022CnSequenceLength] := aBuf[i];
+          Inc(mIso2022CnSequenceLength);
+        end
+      else
+        begin
+          Move(mIso2022CnSequence[1], mIso2022CnSequence[0], 3);
+          mIso2022CnSequence[3] := aBuf[i];
+        end;
+
+      if (mIso2022CnSequenceLength = Length(mIso2022CnSequence)) and
+         IsIso2022CnEnabled and IsIso2022CnDesignator then
+        begin
+          mDetectedCharset := ISO_2022_CN_CHARSET;
+          mState := psFoundIt;
+          Result := mState;
+          Exit;
+        end;
+    end;
+
+  Result := inherited HandleData(aBuf, aLen);
+end;
+
+procedure TnsEscCharSetProber.Reset;
+begin
+  inherited Reset;
+  mIso2022CnSequenceLength := 0;
+end;
+
 function TnsEscCharSetProber.GetConfidence: float;
 begin
   case mState of
@@ -70,5 +141,4 @@ begin
 end;
 
 end.
-
 
