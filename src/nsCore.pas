@@ -134,6 +134,8 @@ type
     WINDOWS_1252_CHARSET      = 031
   );
 
+  TInternalCharsetSet = set of eInternalCharsetID;
+
   TCharsetModelScore = record
     CharsetID: eInternalCharsetID;
     Confidence: float;

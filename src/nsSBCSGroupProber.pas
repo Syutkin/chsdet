@@ -37,6 +37,9 @@ type
       function HandleData(aBuf: pAnsiChar;  aLen: integer): eProbingState; override;
       procedure Reset; override;
       function GetModelScores: TCharsetModelScores; override;
+      procedure ConfigureAllowed(const aAllowed: TInternalCharsetSet);
+      procedure SetPublicCharsetEnabled(aCharset: eInternalCharsetID;
+        aEnabled: Boolean);
 //      {$ifdef DEBUG_chardet}
 //      procedure DumpStatus; override;
 //      {$endif}
@@ -55,6 +58,11 @@ uses
 { TnsSBCSGroupProber }
 const
 	NUM_OF_PROBERS = 13;
+  SBCSModelCharset: array[0..9] of eInternalCharsetID = (
+    WINDOWS_1251_CHARSET, KOI8_R_CHARSET, ISO_8859_5_CHARSET,
+    X_MAC_CYRILLIC_CHARSET, IBM866_CHARSET, IBM855_CHARSET,
+    ISO_8859_7_CHARSET, WINDOWS_1253_CHARSET,
+    LATIN5_BULGARIAN_CHARSET, WINDOWS_BULGARIAN_CHARSET);
 
 constructor TnsSBCSGroupProber.Create;
 var
@@ -124,6 +132,38 @@ begin
     end;
   mPendingASCII[mPendingLength] := aChar;
   Inc(mPendingLength);
+end;
+
+procedure TnsSBCSGroupProber.ConfigureAllowed(
+  const aAllowed: TInternalCharsetSet);
+var
+  i: Integer;
+begin
+  for i := 0 to 9 do
+    mProbers[i].Enabled := SBCSModelCharset[i] in aAllowed;
+  mProbers[10].Enabled :=
+    (WINDOWS_1255_CHARSET in aAllowed) or
+    (ISO_8859_8_CHARSET in aAllowed);
+  mProbers[11].Enabled := WINDOWS_1255_CHARSET in aAllowed;
+  mProbers[12].Enabled := ISO_8859_8_CHARSET in aAllowed;
+  Reset;
+end;
+
+procedure TnsSBCSGroupProber.SetPublicCharsetEnabled(
+  aCharset: eInternalCharsetID; aEnabled: Boolean);
+var
+  i: Integer;
+begin
+  for i := 0 to 9 do
+    if KNOWN_CHARSETS[SBCSModelCharset[i]].CodePage =
+      KNOWN_CHARSETS[aCharset].CodePage then
+      mProbers[i].Enabled := aEnabled;
+  if aCharset = WINDOWS_1255_CHARSET then
+    mProbers[11].Enabled := aEnabled;
+  if aCharset = ISO_8859_8_CHARSET then
+    mProbers[12].Enabled := aEnabled;
+  mProbers[10].Enabled := mProbers[11].Enabled or mProbers[12].Enabled;
+  Reset;
 end;
 
 procedure TnsSBCSGroupProber.Reset;

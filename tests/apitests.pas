@@ -39,6 +39,10 @@ type
     procedure ConfusionResolutionUsesDistinguishingBytes;
     procedure FinishResetAndInvalidFeed;
     procedure ExistingDetectorRemainsUsable;
+    procedure ProfileLimitsModelsWithoutChangingScores;
+    procedure ProfileEscapeAndBOMConflict;
+    procedure ProfileLifecycleAndFullMode;
+    procedure LegacyDisableCharsetCoversAllModels;
   end;
 
 function TAPITests.ReadFixture(const aName: string): RawByteString;
@@ -671,6 +675,190 @@ begin
     detected := detector.Finish;
     AssertEquals('ASCII', detected.Charset);
     AssertEquals(1, Int64(detected.BytesSeen));
+  finally
+    detector.Free;
+  end;
+end;
+
+procedure TAPITests.ProfileLimitsModelsWithoutChangingScores;
+var
+  detector: TCharsetDetector;
+  data: RawByteString;
+  fullResult, limited: TCharsetDetectionResult;
+  index: Integer;
+begin
+  data := ReadFixture('windows-1251-long-lf.txt');
+  fullResult := DetectCharset(data);
+  index := FindCandidate(fullResult, 'windows-1251');
+  AssertTrue(index >= 0);
+  detector := TCharsetDetector.Create;
+  try
+    detector.SetAllowedCharsets(['WINDOWS-1251', 'windows-1251']);
+    detector.Feed(Pointer(data), Length(data));
+    limited := detector.Finish;
+    AssertEquals(1, Length(limited.Candidates));
+    AssertEquals('windows-1251', limited.Candidates[0].Charset);
+    AssertTrue('profile must preserve model confidence',
+      Abs(limited.Confidence - fullResult.Candidates[index].Confidence) < 1e-12);
+
+    detector.Reset;
+    data := #$E2#$8B#$D8#$A1#$CF#$E8#$A5#$9C#$CB#$EE#$82#$87;
+    fullResult := DetectCharset(data);
+    detector.SetAllowedCharsets([fullResult.Candidates[0].Charset]);
+    detector.Feed(Pointer(data), Length(data));
+    limited := detector.Finish;
+    AssertEquals('a weak sole candidate remains unconfirmed',
+      Ord(dsUnknown), Ord(limited.Status));
+    AssertTrue(Abs(limited.Confidence -
+      fullResult.Candidates[0].Confidence) < 1e-12);
+
+    detector.Reset;
+    data := ReadFixture('iso-8859-8-shared-lf.txt');
+    detector.SetAllowedCharsets(['ISO-8859-8']);
+    detector.Feed(Pointer(data), Length(data));
+    limited := detector.Finish;
+    AssertTrue(FindCandidate(limited, 'ISO-8859-8') >= 0);
+    AssertEquals(-1, FindCandidate(limited, 'windows-1255'));
+
+    detector.Reset;
+    detector.SetAllowedCharsets(['windows-1255']);
+    detector.Feed(Pointer(data), Length(data));
+    limited := detector.Finish;
+    AssertTrue(FindCandidate(limited, 'windows-1255') >= 0);
+    AssertEquals(-1, FindCandidate(limited, 'ISO-8859-8'));
+  finally
+    detector.Free;
+  end;
+end;
+
+procedure TAPITests.ProfileEscapeAndBOMConflict;
+var
+  detector: TCharsetDetector;
+  data: RawByteString;
+  detected: TCharsetDetectionResult;
+begin
+  detector := TCharsetDetector.Create;
+  try
+    detector.SetAllowedCharsets(['HZ-GB-2312']);
+    data := '~{5<So~}';
+    detector.Feed(Pointer(data), Length(data));
+    detected := detector.Finish;
+    AssertEquals('HZ-GB-2312', detected.Charset);
+    AssertEquals(-1, FindCandidate(detected, 'ISO-2022-JP'));
+
+    detector.Reset;
+    detector.SetAllowedCharsets(['ISO-2022-JP']);
+    detector.Feed(Pointer(data), Length(data));
+    detected := detector.Finish;
+    AssertTrue('disabled HZ must not be selected',
+      detected.Charset <> 'HZ-GB-2312');
+
+    detector.Reset;
+    detector.SetAllowedCharsets(['windows-1251']);
+    data := #$EF#$BB#$BF'hello';
+    detector.Feed(Pointer(data), Length(data));
+    detected := detector.Finish;
+    AssertEquals(Ord(dsExcludedByProfile), Ord(detected.Status));
+    AssertEquals(Ord(BOM_UTF8), Ord(detected.BOM));
+    AssertEquals(3, detected.BOMSize);
+    AssertEquals(Ord(csBOM), Ord(detected.Source));
+    AssertEquals('UTF-8', detected.Charset);
+    AssertEquals(0, Length(detected.Candidates));
+    AssertFalse(detected.HasConfidence);
+
+    detector.Reset;
+    detector.SetAllowedCharsets(['UTF-8']);
+    detector.Feed(Pointer(data), Length(data));
+    detected := detector.Finish;
+    AssertEquals(Ord(dsDetected), Ord(detected.Status));
+    AssertEquals('UTF-8', detected.Charset);
+
+    detector.Reset;
+    detector.SetAllowedCharsets(['UTF-16LE']);
+    data := ReadFixture('utf-16le-en-lf.txt');
+    detector.Feed(Pointer(data), Length(data));
+    detected := detector.Finish;
+    AssertEquals('UTF-16LE', detected.Charset);
+    AssertEquals(Ord(dsDetected), Ord(detected.Status));
+  finally
+    detector.Free;
+  end;
+end;
+
+procedure TAPITests.LegacyDisableCharsetCoversAllModels;
+var
+  detector: TnsUniversalDetector;
+  data: RawByteString;
+begin
+  data := ReadFixture('windows-1251-long-lf.txt');
+  detector := TnsUniversalDetector.Create;
+  try
+    detector.DisableCharset(1251);
+    detector.HandleData(PAnsiChar(data), Length(data));
+    detector.DataEnd;
+    AssertTrue('both Russian and Bulgarian CP1251 models are disabled',
+      String(detector.GetDetectedCharsetInfo.Name) <> 'windows-1251');
+  finally
+    detector.Free;
+  end;
+  data := #$1B'$B$3$s$K$A$O'#$1B'(B';
+  detector := TnsUniversalDetector.Create;
+  try
+    detector.DisableCharset(52936);
+    detector.HandleData(PAnsiChar(data), Length(data));
+    detector.DataEnd;
+    AssertEquals('ISO-2022-JP',
+      String(detector.GetDetectedCharsetInfo.Name));
+  finally
+    detector.Free;
+  end;
+end;
+
+procedure TAPITests.ProfileLifecycleAndFullMode;
+var
+  detector: TCharsetDetector;
+  data: RawByteString;
+  detected, fullResult: TCharsetDetectionResult;
+  raised: Boolean;
+begin
+  detector := TCharsetDetector.Create;
+  try
+    data := ReadFixture('windows-1251-long-lf.txt');
+    fullResult := DetectCharset(data);
+    detector.SetAllowedCharsets([]);
+    detector.Feed(Pointer(data), Length(data));
+    detected := detector.Finish;
+    AssertEquals(0, Length(detected.Candidates));
+    AssertEquals('', detected.Charset);
+
+    detector.Reset;
+    detector.Feed(Pointer(data), Length(data));
+    detected := detector.Finish;
+    AssertEquals(0, Length(detected.Candidates));
+
+    detector.Reset;
+    raised := False;
+    try
+      detector.SetAllowedCharsets(['not-a-charset']);
+    except
+      on EArgumentException do raised := True;
+    end;
+    AssertTrue('unknown name is rejected', raised);
+    raised := False;
+    data := 'abc';
+    detector.Feed(Pointer(data), Length(data));
+    try
+      detector.SetAllowedCharsets(['ASCII']);
+    except
+      on EInvalidOp do raised := True;
+    end;
+    AssertTrue('profile cannot change after Feed', raised);
+
+    detector.Reset;
+    detector.ClearProfile;
+    data := ReadFixture('windows-1251-long-lf.txt');
+    detector.Feed(Pointer(data), Length(data));
+    CheckEqual(fullResult, detector.Finish, 'full mode after ClearProfile');
   finally
     detector.Free;
   end;

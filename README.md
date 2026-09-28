@@ -72,7 +72,40 @@ The streaming class uses fixed 512-byte blocks inside the shared detector, so ca
 
 An application can read a `TStream` in blocks and call Feed; the detector does not take ownership of the stream.
 
-Charset profiles are planned for a later stage of the 0.3.0 API.
+## Charset profiles
+
+The default detector considers every supported charset. A profile explicitly
+limits the public charset names considered by one `TCharsetDetector` instance:
+
+```pascal
+Detector := TCharsetDetector.Create;
+try
+  Detector.SetAllowedCharsets(['UTF-8', 'UTF-16LE', 'UTF-16BE',
+    'windows-1251']);
+  Detector.Feed(Buffer, Count); // repeat for every input block
+  Detection := Detector.Finish;
+finally
+  Detector.Free;
+end;
+```
+
+Names are the public names returned by the detector (case insensitive).
+Unknown names raise `EArgumentException`; repeated names have no extra effect.
+An empty list is valid and permits no charset. The list applies to every
+language model of each allowed charset. It also selects individual escape
+charsets without disabling other escape models. The legacy
+`TnsUniversalDetector.DisableCharset(CodePage)` remains available.
+
+Set or clear the profile before the first nonempty `Feed`. Changing it after
+input or `Finish` raises `EInvalidOp`; call `Reset` first. `Reset` preserves the
+profile. `ClearProfile` restores the default full mode. `DetectCharset(Data)`
+always uses full mode.
+
+An excluded BOM returns `dsExcludedByProfile`, the actual BOM, its size and
+charset name, with no candidates or statistical confidence. Other excluded
+Unicode or ASCII decisions use the same status. A profile does not increase
+model confidence: scores retain their original meaning. Restricting the
+candidate set can remove ambiguity, but a weak score remains weak.
 
 ## Licence
 

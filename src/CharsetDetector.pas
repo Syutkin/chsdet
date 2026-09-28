@@ -50,14 +50,20 @@ type
     FFinal: Boolean;
     FSharedHebrewBytes: Boolean;
     FHasHebrew: Boolean;
+    FProfileActive: Boolean;
+    FAllowedCharsets: TInternalCharsetSet;
     FResult: TCharsetDetectionResult;
     function BuildResult: TCharsetDetectionResult;
+    procedure ApplyProfile;
+    function IsAllowed(aCharset: eInternalCharsetID): Boolean;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Feed(Buffer: Pointer; Count: SizeInt);
     function Finish: TCharsetDetectionResult;
     procedure Reset;
+    procedure SetAllowedCharsets(const aNames: array of string);
+    procedure ClearProfile;
   end;
 
 function DetectCharset(const Data: RawByteString): TCharsetDetectionResult;
@@ -65,7 +71,8 @@ function DetectCharset(const Data: RawByteString): TCharsetDetectionResult;
 implementation
 
 uses
-  SysUtils, CharsetByteValidity, CharsetConfusion;
+  SysUtils, CharsetByteValidity, CharsetConfusion, nsSBCSGroupProber,
+  MultiModelProber;
 
 type
   TCharsetCoreDetector = class(TnsUniversalDetector)
@@ -75,7 +82,29 @@ type
     function ModelScores: TCharsetModelScores;
     function SeenBytes: TCharsetSeenBytes;
     function ConfusionDecision(aPair: TConfusionPair): TConfusionDecision;
+    procedure ConfigureAllowed(const aAllowed: TInternalCharsetSet);
   end;
+
+procedure TCharsetCoreDetector.ConfigureAllowed(
+  const aAllowed: TInternalCharsetSet);
+var
+  charset: eInternalCharsetID;
+begin
+  for charset := Low(eInternalCharsetID) to High(eInternalCharsetID) do
+    begin
+      if mCharSetProbers[0] is TMultiModelProber then
+        TMultiModelProber(mCharSetProbers[0]).EnableCharset(charset,
+          charset in aAllowed);
+      if mCharSetProbers[3] is TMultiModelProber then
+        TMultiModelProber(mCharSetProbers[3]).EnableCharset(charset,
+          charset in aAllowed);
+      TMultiModelProber(mEscCharSetProber).EnableCharset(charset,
+        charset in aAllowed);
+    end;
+  TnsSBCSGroupProber(mCharSetProbers[1]).ConfigureAllowed(aAllowed);
+  mCharSetProbers[2].Enabled := WINDOWS_1252_CHARSET in aAllowed;
+  Reset;
+end;
 
 function TCharsetCoreDetector.ChosenCharset: eInternalCharsetID;
 begin
@@ -259,6 +288,8 @@ constructor TCharsetDetector.Create;
 begin
   inherited Create;
   FCore := TCharsetCoreDetector.Create;
+  FProfileActive := False;
+  FAllowedCharsets := [Low(eInternalCharsetID)..High(eInternalCharsetID)];
   Reset;
 end;
 
@@ -277,6 +308,53 @@ begin
   FSharedHebrewBytes := True;
   FHasHebrew := False;
   FResult := Default(TCharsetDetectionResult);
+end;
+
+procedure TCharsetDetector.ApplyProfile;
+begin
+  TCharsetCoreDetector(FCore).ConfigureAllowed(FAllowedCharsets);
+  Reset;
+end;
+
+function TCharsetDetector.IsAllowed(aCharset: eInternalCharsetID): Boolean;
+begin
+  Result := not FProfileActive or (aCharset in FAllowedCharsets);
+end;
+
+procedure TCharsetDetector.SetAllowedCharsets(const aNames: array of string);
+var
+  allowed: TInternalCharsetSet;
+  i: Integer;
+  charset: eInternalCharsetID;
+  found: Boolean;
+begin
+  if (FBytesSeen <> 0) or FFinal then
+    raise EInvalidOp.Create('SetAllowedCharsets requires a fresh detector');
+  allowed := [];
+  for i := 0 to High(aNames) do
+    begin
+      found := False;
+      for charset := Succ(UNKNOWN_CHARSET) to High(eInternalCharsetID) do
+        if SameText(aNames[i], String(KNOWN_CHARSETS[charset].Name)) then
+          begin
+            Include(allowed, charset);
+            found := True;
+          end;
+      if not found then
+        raise EArgumentException.Create('Unknown charset: ' + aNames[i]);
+    end;
+  FProfileActive := True;
+  FAllowedCharsets := allowed;
+  ApplyProfile;
+end;
+
+procedure TCharsetDetector.ClearProfile;
+begin
+  if (FBytesSeen <> 0) or FFinal then
+    raise EInvalidOp.Create('ClearProfile requires a fresh detector');
+  FProfileActive := False;
+  FAllowedCharsets := [Low(eInternalCharsetID)..High(eInternalCharsetID)];
+  ApplyProfile;
 end;
 
 procedure TCharsetDetector.Feed(Buffer: Pointer; Count: SizeInt);
@@ -353,6 +431,16 @@ begin
   core := TCharsetCoreDetector(FCore);
   chosen := core.ChosenCharset;
   source := core.DecisionSource;
+  if (chosen <> UNKNOWN_CHARSET) and
+    (source in [csBOM, csASCII, csUTF8Validation, csUTF16Structure]) and
+    not IsAllowed(chosen) then
+    begin
+      Result.Status := dsExcludedByProfile;
+      Result.Charset := String(KNOWN_CHARSETS[chosen].Name);
+      Result.CodePage := KNOWN_CHARSETS[chosen].CodePage;
+      Result.Source := source;
+      Exit;
+    end;
   if (source in [csBOM, csASCII, csUTF8Validation, csUTF16Structure]) and
     (chosen <> UNKNOWN_CHARSET) then
     begin
@@ -369,6 +457,7 @@ begin
   for i := 0 to High(scores) do
     if (scores[i].State <> psNotMe) and
       (scores[i].Confidence > SURE_NO) and
+      IsAllowed(scores[i].CharsetID) and
       SingleByteCharsetCanDecode(scores[i].CharsetID, seenBytes) then
       AddCandidate(Result.Candidates, scores[i].CharsetID,
         scores[i].Confidence, True, csStatistics);

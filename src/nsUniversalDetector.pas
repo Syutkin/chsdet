@@ -86,11 +86,11 @@ type
 implementation
 uses
   SysUtils,
-  nsGroupProber,
   nsMBCSMultiProber,
   nsSBCSGroupProber,
   nsEscCharsetProber,
   nsLatin1Prober,
+  MultiModelProber,
   MBUnicodeMultiProber,
   CharsetBOM;
 
@@ -206,6 +206,8 @@ begin
         maxProber := 0;
         for i := 0 to Pred(NUM_OF_CHARSET_PROBERS) do
           begin
+            if not mCharSetProbers[i].Enabled then
+              Continue;
             if (i = 3) and not utf8Ready then
               Continue;
             proberConfidence := mCharSetProbers[i].GetConfidence;
@@ -522,8 +524,12 @@ begin
 end;
 
 procedure TnsUniversalDetector.DisableCharset(CodePage: integer);
+var
+  charset: eInternalCharsetID;
 begin
-  DoEnableCharset(GetCharsetID(CodePage), false);
+  for charset := Succ(UNKNOWN_CHARSET) to High(eInternalCharsetID) do
+    if KNOWN_CHARSETS[charset].CodePage = CodePage then
+      DoEnableCharset(charset, False);
 end;
 
 function TnsUniversalDetector.GetCharsetID(CodePage: integer): eInternalCharsetID;
@@ -545,24 +551,18 @@ var
 begin
   if Charset = UNKNOWN_CHARSET then
     exit;
+  TnsSBCSGroupProber(mCharSetProbers[1]).SetPublicCharsetEnabled(Charset,
+    SetEnabledTo);
   for i := 0 to Pred(NUM_OF_CHARSET_PROBERS) do
     begin
-      if (mCharSetProbers[i] is TnsGroupProber) then
-        begin
-          if TnsGroupProber(mCharSetProbers[i]).EnableCharset(Charset, SetEnabledTo) then
-            exit;
-        end;
-      if (mCharSetProbers[i] is TnsEscCharSetProber) then
-        begin
-          TnsEscCharSetProber(mCharSetProbers[i]).Enabled := SetEnabledTo;
-        end;
-      if (mCharSetProbers[i] is TCustomDetector) then
-        begin
-          if TCustomDetector(mCharSetProbers[i]).GetDetectedCharset = Charset then
-            TCustomDetector(mCharSetProbers[i]).Enabled := SetEnabledTo;
-        end;
+      if mCharSetProbers[i] is TMultiModelProber then
+        TMultiModelProber(mCharSetProbers[i]).EnableCharset(Charset,
+          SetEnabledTo);
     end;
-
+  if Charset = WINDOWS_1252_CHARSET then
+    mCharSetProbers[2].Enabled := SetEnabledTo;
+  TMultiModelProber(mEscCharSetProber).EnableCharset(Charset, SetEnabledTo);
+  Reset;
 end;
 
 end.
