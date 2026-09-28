@@ -5,12 +5,21 @@ interface
 uses
   nsCore;
 
+{ For a complete buffer, including EOF after a partial BOM prefix. }
+function DetectCharsetBOM(aBuf: PAnsiChar; aLen: integer): eBOMKind;
+
 { Returns False while the bytes can still begin a longer BOM. At EOF, the
-  longest complete matching BOM wins; incomplete prefixes are not BOMs. }
+  longest complete matching BOM wins; incomplete prefixes are not BOMs.
+  Without EOF, callers need up to four initial bytes before a final answer. }
 function ResolveCharsetBOM(aBuf: PAnsiChar; aLen: integer; aAtEnd: Boolean;
   out aBOM: eBOMKind): Boolean;
 
 implementation
+
+function DetectCharsetBOM(aBuf: PAnsiChar; aLen: integer): eBOMKind;
+begin
+  ResolveCharsetBOM(aBuf, aLen, True, Result);
+end;
 
 function ResolveCharsetBOM(aBuf: PAnsiChar; aLen: integer; aAtEnd: Boolean;
   out aBOM: eBOMKind): Boolean;

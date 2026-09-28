@@ -24,7 +24,9 @@ interface
 uses
 {$I dbg.inc}
   nsCore,
-  CustomDetector;
+  CustomDetector,
+  CharsetUTF8,
+  CharsetUTF16;
 
 const
   NUM_OF_CHARSET_PROBERS = 4;
@@ -49,6 +51,8 @@ type
     mDetectedBOM: eBOMKind;
     mBOMBuffer: array[0..3] of AnsiChar;
     mBOMLength: integer;
+    mUTF8: TCharsetUTF8Validator;
+    mUTF16: TCharsetUTF16Prober;
 
     procedure Report(aCharsetID: eInternalCharsetID);
     procedure ResolveInitialBytes(aAtEnd: Boolean);
@@ -104,6 +108,8 @@ begin
   mCharSetProbers[2] := TnsLatin1Prober.Create;
   mCharSetProbers[3] := TMBUnicodeMultiProber.Create;
   mEscCharSetProber := TnsEscCharSetProber.Create;
+  mUTF8 := TCharsetUTF8Validator.Create;
+  mUTF16 := TCharsetUTF16Prober.Create;
   Reset;
 end;
 
@@ -115,6 +121,8 @@ begin
     mCharSetProbers[i].Free;
 
   mEscCharSetProber.Free;
+  mUTF8.Free;
+  mUTF16.Free;
 
   inherited;
 end;
@@ -125,6 +133,9 @@ var
   maxProberConfidence: float;
   maxProber: int32;
   i: integer;
+  utf16Charset: eInternalCharsetID;
+  utf8Ready: Boolean;
+  asciiCandidate: Boolean;
 begin
   if not mGotData then
     (* we haven't got any data yet, return immediately *)
@@ -134,12 +145,49 @@ begin
   if mStart then
     ResolveInitialBytes(True);
 
-  if mDetectedCharset <> UNKNOWN_CHARSET then
+  if mDone then
+    Exit;
+  if mDetectedBOM <> BOM_Not_Found then
     begin
       mDone := TRUE;
-      Report(mDetectedCharset);
       exit;
     end;
+
+  asciiCandidate := mUTF8.IsASCII and not mUTF8.HasNUL;
+  { Classify ASCII before UTF-8, but resolve UTF-16 structure before making
+    the ASCII result final: UTF-16 can also contain only low-byte values. }
+  utf16Charset := mUTF16.Detect;
+  if utf16Charset <> UNKNOWN_CHARSET then
+    begin
+      mDetectedCharset := utf16Charset;
+      mDone := True;
+      Exit;
+    end;
+
+  if asciiCandidate then
+    begin
+      if mInputState = isEscAscii then
+        mDetectedCharset := mEscCharSetProber.GetDetectedCharset;
+      if mDetectedCharset = UNKNOWN_CHARSET then
+        mDetectedCharset := PURE_ASCII_CHARSET;
+      mDone := True;
+      Exit;
+    end;
+
+  { Validity alone is weak evidence on short byte strings. Two complete
+    non-ASCII characters are needed to prefer UTF-8 to legacy encodings. }
+  utf8Ready := not mUTF8.HasNUL and mUTF8.Finish and
+    (mUTF8.MultibyteCount >= 2);
+  if utf8Ready then
+    begin
+      mDetectedCharset := UTF8_CHARSET;
+      mDone := True;
+      Exit;
+    end;
+
+  if (mDetectedCharset = UTF8_CHARSET) and not utf8Ready then
+    mDetectedCharset := UNKNOWN_CHARSET;
+
   case mInputState of
     isHighbyte:
       begin
@@ -147,6 +195,8 @@ begin
         maxProber := 0;
         for i := 0 to Pred(NUM_OF_CHARSET_PROBERS) do
           begin
+            if (i = 3) and not utf8Ready then
+              Continue;
             proberConfidence := mCharSetProbers[i].GetConfidence;
             if proberConfidence > maxProberConfidence then
               begin
@@ -164,9 +214,11 @@ begin
       end;
   else
     begin
-      mDetectedCharset := PURE_ASCII_CHARSET;
+      if not mUTF8.HasNUL then
+        mDetectedCharset := PURE_ASCII_CHARSET;
     end;
   end;                                  {case}
+  mDone := True;
 {$IFDEF DEBUG_chardet}
   AddDump('Universal detector - DataEnd');
 {$ENDIF}
@@ -199,13 +251,12 @@ var
   i: integer;
   st: eProbingState;
 begin
+  mUTF8.Feed(aBuf, aLen);
+  mUTF16.Feed(aBuf, aLen);
 
   for i := 0 to Pred(aLen) do
-    (*other than 0xa0, if every othe character is ascii, the page is ascii*)
-    if (aBuf[i] > #$80) and (aBuf[i] <> #$A0) then
+    if Byte(aBuf[i]) >= $80 then
       begin
-        (*Since many Ascii only page contains NBSP *)
-        (*we got a non-ascii byte (high-byte)*)
         if mInputState <> isHighbyte then
           begin
             (*adjust state*)
@@ -248,8 +299,8 @@ begin
             st := mCharSetProbers[i].HandleData(aBuf, aLen);
             if st = psFoundIt then
               begin
-                mDone := TRUE;
-                mDetectedCharset := mCharSetProbers[i].GetDetectedCharset;
+                if mDetectedCharset = UNKNOWN_CHARSET then
+                  mDetectedCharset := mCharSetProbers[i].GetDetectedCharset;
                 break;
               end;
           end;
@@ -286,6 +337,8 @@ begin
     mCharSetProbers[i].Reset;
   mDetectedBOM := BOM_Not_Found;
   mBOMLength := 0;
+  mUTF8.Reset;
+  mUTF16.Reset;
 end;
 
 function TnsUniversalDetector.GetDetectedCharsetInfo: nsCore.rCharsetInfo;

@@ -20,6 +20,20 @@ Charset Detector doesn't need any external components.
 -----------Output
 As result you will get guessed charset as MS Windows Code Page id and charset name.
 
+-----------Unicode detection
+CharsetBOM.DetectCharsetBOM accepts a complete initial buffer and treats its end
+as EOF. For streaming input, CharsetBOM.ResolveCharsetBOM needs up to four
+initial bytes before it can rule out a longer BOM; call it with aAtEnd=True
+when no more bytes will arrive.
+
+Without a BOM, the detector checks UTF-16LE/BE structure, then returns ASCII
+for ASCII-only text. NUL-containing data is examined as possible UTF-16 rather
+than returned as ASCII immediately. Escape-encoded text keeps its escape
+detector result. Strict UTF-8 validation covers every input block, including
+an incomplete final sequence. At least two complete non-ASCII UTF-8 characters
+are required to prefer UTF-8 to a legacy encoding. Valid ASCII is returned as
+ASCII, not UTF-8. Short or structurally ambiguous UTF-16 may remain Unknown.
+
 -----------Licence
 Charset Detector is open source project and distributed under GNU LGPL.
 See the GNU Lesser General Public License for more details - https://opensource.org/licenses/LGPL-2.1

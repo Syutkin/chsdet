@@ -158,11 +158,15 @@ begin
   AssertEquals(Ord(BOM_Not_Found), Ord(bom));
   AssertTrue(ResolveCharsetBOM(PAnsiChar(data), Length(data), True, bom));
   AssertEquals(Ord(BOM_UTF16_LE), Ord(bom));
+  AssertEquals(Ord(BOM_UTF16_LE),
+    Ord(DetectCharsetBOM(PAnsiChar(data), Length(data))));
 
   data := #$EF#$BB;
   AssertFalse(ResolveCharsetBOM(PAnsiChar(data), Length(data), False, bom));
   AssertTrue(ResolveCharsetBOM(PAnsiChar(data), Length(data), True, bom));
   AssertEquals(Ord(BOM_Not_Found), Ord(bom));
+  AssertEquals(Ord(BOM_Not_Found),
+    Ord(DetectCharsetBOM(PAnsiChar(data), Length(data))));
 end;
 
 procedure TBOMTests.BOMOnlyAndAllSplits;
