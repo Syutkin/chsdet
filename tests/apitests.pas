@@ -446,7 +446,7 @@ begin
   finally
     detector.Free;
   end;
-  AssertTrue('expected the complete fixture corpus', tested >= 160);
+  AssertTrue('expected the complete fixture corpus', tested >= 216);
 end;
 
 procedure TAPITests.CrossesInternalBlocks;

@@ -11,7 +11,7 @@ options such as `--suite` and `--list` are forwarded to the runner.
 
 ## Fixtures
 
-All 160 encoding fixtures require an exact charset label and BOM result.
+All 216 encoding fixtures require an exact charset label and BOM result.
 Local `tests/baseline/` reports are ignored by Git.
 
 ## Reports and audits
@@ -25,11 +25,15 @@ CHSDET_FIXTURE_REPORT=tests/.test_build/fixtures.tsv \
   ./tests/run-tests.sh --all --format=plain --sparse
 ```
 
-Audit fixture bytes, hashes and line endings, or regenerate the confusion
-tables, with Python 3:
+Audit fixture bytes, hashes and line endings with Python 3 and `iconv`:
 
 ```sh
 python3 tests/audit-fixtures.py --output tests/.test_build/fixture-audit.tsv
+```
+
+Regenerate the confusion tables with:
+
+```sh
 python3 tests/generate-confusion-tables.py
 ```
 

@@ -87,7 +87,8 @@ The detector derives from Mozilla's universalchardet, the original chsdet
 project by Nikolaj Yakowlew, and the Double Commander component by Alexander
 Koblov. The 0.3.0 API and detection changes were developed in this repository.
 Generated confusion tables identify their source in
-`src/CharsetConfusionTables.inc`.
+`src/CharsetConfusionTables.inc`. The Unicode data notice is in
+[UNICODE-LICENSE](UNICODE-LICENSE).
 
 ChsDet is distributed under the GNU Lesser General Public License; see
 [LICENCE](LICENCE). Changes in this version are listed in the

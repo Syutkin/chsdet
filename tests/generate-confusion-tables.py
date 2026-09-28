@@ -51,6 +51,8 @@ def byte_category(byte: int, codec: str) -> int:
 def generate() -> str:
     lines = [
         "{ Generated from Python 3 single-byte codecs and unicodedata.category.",
+        f"  Unicode Character Database version: {unicodedata.unidata_version}.",
+        "  Unicode data license: UNICODE-LICENSE in the repository root.",
         "  Categories: 0 control/undefined, 1 separator, 2 lower, 3 upper,",
         "  4 other letter, 5 mark, 6 opening punctuation, 7 closing punctuation,",
         "  8 dash, 9 other punctuation, 10 symbol, 11 number. }",

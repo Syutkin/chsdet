@@ -4,6 +4,7 @@
 import argparse
 import csv
 import hashlib
+import subprocess
 from pathlib import Path
 
 
@@ -18,16 +19,37 @@ def audit(root):
             "windows-1253": "cp1253", "windows-1255": "cp1255",
             "iso-8859-5": "iso8859_5", "iso-8859-7": "iso8859_7",
             "iso-8859-8": "iso8859_8", "ibm866": "cp866",
+            "ibm855": "cp855", "x-mac-cyrillic": "mac_cyrillic",
+            "shift-jis": "shift_jis", "big5": "big5",
+            "gb18030": "gb18030", "euc-jp": "euc_jp",
+            "euc-kr": "euc_kr", "x-euc-tw": "EUC-TW",
+            "iso-2022-jp": "iso2022_jp", "iso-2022-kr": "iso2022_kr",
+            "iso-2022-cn": "ISO-2022-CN", "hz-gb-2312": "hz",
             "koi8-r": "koi8_r", "ascii": "ascii",
             "utf-16le": "utf-16-le", "utf-16be": "utf-16-be",
+            "utf-32le": "utf-32", "utf-32be": "utf-32",
             "utf-8": "utf-8",
         }
         codec = next(value for key, value in codecs.items()
                      if stem.startswith(key + "-"))
-        decoded = data.decode(codec, errors="strict")
+        if codec in ("EUC-TW", "ISO-2022-CN"):
+            decoded = subprocess.run(
+                ["iconv", "-f", codec, "-t", "UTF-8"],
+                input=data, capture_output=True, check=True,
+            ).stdout.decode("utf-8")
+        else:
+            decoded = data.decode(codec, errors="strict")
         if stem.endswith("-crlf.txt"):
             lf_path = root / stem.replace("-crlf.txt", "-lf.txt")
-            if decoded.replace("\r\n", "\n") != lf_path.read_bytes().decode(codec):
+            lf_data = lf_path.read_bytes()
+            if codec in ("EUC-TW", "ISO-2022-CN"):
+                lf_decoded = subprocess.run(
+                    ["iconv", "-f", codec, "-t", "UTF-8"],
+                    input=lf_data, capture_output=True, check=True,
+                ).stdout.decode("utf-8")
+            else:
+                lf_decoded = lf_data.decode(codec, errors="strict")
+            if decoded.replace("\r\n", "\n") != lf_decoded:
                 raise ValueError(f"LF/CRLF text differs: {stem}")
         if stem.startswith("iso-8859-8-"):
             try:

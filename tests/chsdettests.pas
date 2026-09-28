@@ -183,6 +183,20 @@ begin
   // Byte DF distinguishes ISO-8859-8 from Windows-1255 in these fixtures.
   AddTextVariants(Result, 'iso-8859-8', 'ISO-8859-8');
   AddTextVariants(Result, 'ibm866', 'IBM866');
+  AddTextVariants(Result, 'ibm855', 'IBM855');
+  AddTextVariants(Result, 'x-mac-cyrillic', 'x-mac-cyrillic');
+  AddTextVariants(Result, 'shift-jis', 'Shift_JIS');
+  AddTextVariants(Result, 'big5', 'Big5');
+  AddTextVariants(Result, 'gb18030', 'GB18030');
+  AddTextVariants(Result, 'euc-jp', 'EUC-JP');
+  AddTextVariants(Result, 'euc-kr', 'EUC-KR');
+  AddTextVariants(Result, 'x-euc-tw', 'x-euc-tw');
+  AddTextVariants(Result, 'iso-2022-jp', 'ISO-2022-JP');
+  AddTextVariants(Result, 'iso-2022-kr', 'ISO-2022-KR');
+  AddTextVariants(Result, 'iso-2022-cn', 'ISO-2022-CN');
+  AddTextVariants(Result, 'hz-gb-2312', 'HZ-GB-2312');
+  AddBomVariants(Result, 'utf-32le', 'UTF-32LE', BOM_UCS4_LE);
+  AddBomVariants(Result, 'utf-32be', 'UTF-32BE', BOM_UCS4_BE);
 
   AddUtfVariants(Result, 'ru');
   AddUtfVariants(Result, 'en');
