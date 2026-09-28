@@ -76,6 +76,10 @@ begin
     Exit(-3);
   if (aCurrent = 7) and not IsLetter(aBefore) and IsLetter(aAfter) then
     Exit(-3);
+  { A miscellaneous punctuation mark immediately before a letter rarely
+    forms the start of a word (for example pilcrow versus Greek Ά). }
+  if (aCurrent = 9) and (aBefore = 1) and IsLetter(aAfter) then
+    Exit(-2);
   if (aCurrent = 10) and IsLetter(aBefore) and IsLetter(aAfter) then
     Exit(-3);
   if (aCurrent = 10) and (IsLetter(aBefore) or IsLetter(aAfter)) then

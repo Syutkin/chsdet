@@ -27,9 +27,15 @@ uses
 
 type
 	TnsSBCSGroupProber = class(TnsGroupProber)
+		private
+      mPendingASCII: array of AnsiChar;
+      mPendingLength: Integer;
+      mSegmentHasHighByte: Boolean;
+      procedure AppendPending(aChar: AnsiChar);
 		public
       constructor Create; reintroduce;
       function HandleData(aBuf: pAnsiChar;  aLen: integer): eProbingState; override;
+      procedure Reset; override;
       function GetModelScores: TCharsetModelScores; override;
 //      {$ifdef DEBUG_chardet}
 //      procedure DumpStatus; override;
@@ -88,6 +94,12 @@ begin
         mProbers[i] := nil;
       end;
 
+  { These models must see the complete filtered stream. A shortcut reached
+    between external chunks would freeze their scores at a chunk boundary. }
+  for i := 0 to Pred(NUM_OF_PROBERS) do
+    if mProbers[i] is TnsSingleByteCharSetProber then
+      TnsSingleByteCharSetProber(mProbers[i]).UseShortcuts := False;
+
   inherited Create;
   (* disable latin2 before latin1 is available, otherwise all latin1 *)
   (* will be detected as latin2 because of their similarity.*)
@@ -95,27 +107,92 @@ begin
   // mProbers[11] = new nsSingleByteCharSetProber(&Win1250HungarianModel);
 end;
 
+procedure TnsSBCSGroupProber.AppendPending(aChar: AnsiChar);
+var
+  capacity: Integer;
+begin
+  if mPendingLength = Length(mPendingASCII) then
+    begin
+      capacity := Length(mPendingASCII);
+      if capacity < 64 then
+        capacity := 64
+      else if capacity <= High(Integer) div 2 then
+        capacity := capacity * 2
+      else
+        capacity := High(Integer);
+      SetLength(mPendingASCII, capacity);
+    end;
+  mPendingASCII[mPendingLength] := aChar;
+  Inc(mPendingLength);
+end;
+
+procedure TnsSBCSGroupProber.Reset;
+begin
+  inherited Reset;
+  SetLength(mPendingASCII, 0);
+  mPendingLength := 0;
+  mSegmentHasHighByte := False;
+end;
+
 function TnsSBCSGroupProber.HandleData(aBuf: pAnsiChar; aLen: integer): eProbingState;
 var
-  newBuf1: pAnsiChar;
-  newLen1: integer;
+  filtered: PAnsiChar;
+  filteredLength, i: Integer;
+  value: AnsiChar;
+  isDelimiter: Boolean;
 begin
-  newBuf1 := AllocMem(aLen);
-  newLen1 := 0;
-  (*apply filter to original buffer, and we got new buffer back*)
-  (*depend on what script it is, we will feed them the new buffer *)
-  (*we got after applying proper filter*)
-  (*this is done without any consideration to KeepEnglishLetters*)
-  (*of each prober since as of now, there are no probers here which*)
-  (*recognize languages with English characters.*)
   Result := mState;
+  if (mState <> psDetecting) or (aLen <= 0) then
+    Exit;
+  filtered := GetMem(aLen);
+  filteredLength := 0;
   try
-    if (not FilterWithoutEnglishLetters(aBuf,aLen,newBuf1,newLen1)) or
-        (newLen1 = 0) then
-      exit; (* Nothing to see here, move on.*)
-    inherited HandleData(newBuf1, newLen1);
+    for i := 0 to aLen - 1 do
+      begin
+        value := aBuf[i];
+        isDelimiter := (value < 'A') or
+          ((value > 'Z') and (value < 'a')) or (value > 'z');
+        if Byte(value) > $80 then
+          begin
+            if not mSegmentHasHighByte then
+              begin
+                { The preceding ASCII letters belong to this segment only
+                  once a high byte has appeared. Emit them in input order. }
+                if filteredLength > 0 then
+                  begin
+                    inherited HandleData(filtered, filteredLength);
+                    filteredLength := 0;
+                  end;
+                if mPendingLength > 0 then
+                  inherited HandleData(@mPendingASCII[0], mPendingLength);
+                mPendingLength := 0;
+                mSegmentHasHighByte := True;
+              end;
+            filtered[filteredLength] := value;
+            Inc(filteredLength);
+          end
+        else if isDelimiter then
+          begin
+            if mSegmentHasHighByte then
+              begin
+                filtered[filteredLength] := ' ';
+                Inc(filteredLength);
+              end;
+            mPendingLength := 0;
+            mSegmentHasHighByte := False;
+          end
+        else if mSegmentHasHighByte then
+          begin
+            filtered[filteredLength] := value;
+            Inc(filteredLength);
+          end
+        else
+          AppendPending(value);
+      end;
+    if filteredLength > 0 then
+      inherited HandleData(filtered, filteredLength);
   finally
-    FreeMem(newBuf1, aLen);
+    FreeMem(filtered);
   end;
   Result:= mState;
 end;

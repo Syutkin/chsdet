@@ -14,6 +14,8 @@ type
   TAPITests = class(TTestCase)
   private
     function ReadFixture(const aName: string): RawByteString;
+    function DetectLegacyInBlocks(const aData: RawByteString;
+      aBlockSize: Integer): string;
     function FindCandidate(const aResult: TCharsetDetectionResult;
       const aName: string): Integer;
     procedure CheckEqual(const aExpected, aActual: TCharsetDetectionResult;
@@ -29,8 +31,11 @@ type
     procedure InvalidHebrewCandidatesAreExcluded;
     procedure HebrewWithCombiningMarks;
     procedure HZAcrossChunksAndPlainASCII;
-    procedure LegacyGreekOneShotUsesAllModels;
+    procedure LegacyGreekStreamingUsesAllModels;
+    procedure LegacyWesternStreamingKeepsWordBoundaries;
     procedure LegacyBulgarianModelCanChooseMacCyrillic;
+    procedure CP932ExtensionBytesRemainValid;
+    procedure GreekWordInitialLetterBeatsPunctuation;
     procedure ConfusionResolutionUsesDistinguishingBytes;
     procedure FinishResetAndInvalidFeed;
     procedure ExistingDetectorRemainsUsable;
@@ -51,6 +56,31 @@ begin
       stream.ReadBuffer(Result[1], Length(Result));
   finally
     stream.Free;
+  end;
+end;
+
+function TAPITests.DetectLegacyInBlocks(const aData: RawByteString;
+  aBlockSize: Integer): string;
+var
+  legacy: TnsUniversalDetector;
+  position, count: Integer;
+begin
+  legacy := TnsUniversalDetector.Create;
+  try
+    position := 1;
+    while position <= Length(aData) do
+      begin
+        count := aBlockSize;
+        if count = 0 then count := Length(aData);
+        if count > Length(aData) - position + 1 then
+          count := Length(aData) - position + 1;
+        legacy.HandleData(@aData[position], count);
+        Inc(position, count);
+      end;
+    legacy.DataEnd;
+    Result := String(legacy.GetDetectedCharsetInfo.Name);
+  finally
+    legacy.Free;
   end;
 end;
 
@@ -174,7 +204,7 @@ begin
   end;
 end;
 
-procedure TAPITests.LegacyGreekOneShotUsesAllModels;
+procedure TAPITests.LegacyGreekStreamingUsesAllModels;
 const
   { Windows-1253: a Greek diacritic, capital alpha with tonos, and a sentence.
     Both Greek encodings can decode these bytes, but their readings differ. }
@@ -183,26 +213,33 @@ const
     #$E4#$EF#$EA#$E9#$EC#$E7' '#$E1#$F0#$EB#$EF#$F5' ' +
     #$E5#$EB#$EB#$E7#$ED#$E9#$EA#$EF#$F5' ' +
     #$EA#$E5#$E9#$EC#$E5#$ED#$EF#$F5'. ';
+  BlockSizes: array[0..4] of Integer = (0, 1, 2, 7, 512);
 var
   data: RawByteString;
-  legacy: TnsUniversalDetector;
   detected: TCharsetDetectionResult;
-  i: Integer;
+  i, blockSize: Integer;
 begin
   data := '';
   for i := 1 to 140 do
     data := data + GreekLine;
-  legacy := TnsUniversalDetector.Create;
-  try
-    legacy.HandleData(PAnsiChar(data), Length(data));
-    legacy.DataEnd;
-    detected := DetectCharset(data);
-    AssertEquals('windows-1253', detected.Charset);
-    AssertEquals(detected.Charset,
-      String(legacy.GetDetectedCharsetInfo.Name));
-  finally
-    legacy.Free;
-  end;
+  detected := DetectCharset(data);
+  AssertEquals('windows-1253', detected.Charset);
+  for blockSize in BlockSizes do
+    AssertEquals('block size ' + IntToStr(blockSize), detected.Charset,
+      DetectLegacyInBlocks(data, blockSize));
+end;
+
+procedure TAPITests.LegacyWesternStreamingKeepsWordBoundaries;
+const
+  BlockSizes: array[0..4] of Integer = (0, 1, 2, 7, 512);
+var
+  data: RawByteString;
+  blockSize: Integer;
+begin
+  data := ReadFixture('../context/windows-1252-stream.txt');
+  for blockSize in BlockSizes do
+    AssertEquals('block size ' + IntToStr(blockSize), 'windows-1252',
+      DetectLegacyInBlocks(data, blockSize));
 end;
 
 procedure TAPITests.LegacyBulgarianModelCanChooseMacCyrillic;
@@ -221,6 +258,49 @@ begin
     detected := DetectCharset(data);
     AssertEquals(Ord(dsDetected), Ord(detected.Status));
     AssertEquals('x-mac-cyrillic', detected.Charset);
+    AssertEquals(detected.Charset,
+      String(legacy.GetDetectedCharsetInfo.Name));
+  finally
+    legacy.Free;
+  end;
+end;
+
+procedure TAPITests.CP932ExtensionBytesRemainValid;
+var
+  data: RawByteString;
+  legacy: TnsUniversalDetector;
+  detected: TCharsetDetectionResult;
+begin
+  { The FA 40 vendor extension is valid in code page 932. }
+  data := ReadFixture('../context/cp932-extension.txt');
+  legacy := TnsUniversalDetector.Create;
+  try
+    legacy.HandleData(PAnsiChar(data), Length(data));
+    legacy.DataEnd;
+    detected := DetectCharset(data);
+    AssertEquals('Shift_JIS', detected.Charset);
+    AssertEquals(detected.Charset,
+      String(legacy.GetDetectedCharsetInfo.Name));
+  finally
+    legacy.Free;
+  end;
+end;
+
+procedure TAPITests.GreekWordInitialLetterBeatsPunctuation;
+var
+  data: RawByteString;
+  legacy: TnsUniversalDetector;
+  detected: TCharsetDetectionResult;
+begin
+  { B6 is Ά in ISO-8859-7 and ¶ in Windows-1253. }
+  data := ReadFixture('../context/iso-8859-7-word-initial-b6.txt');
+  legacy := TnsUniversalDetector.Create;
+  try
+    legacy.HandleData(PAnsiChar(data), Length(data));
+    legacy.DataEnd;
+    detected := DetectCharset(data);
+    AssertEquals('ISO-8859-7', detected.Charset);
+    AssertEquals(Ord(csConfusionResolution), Ord(detected.Source));
     AssertEquals(detected.Charset,
       String(legacy.GetDetectedCharsetInfo.Name));
   finally

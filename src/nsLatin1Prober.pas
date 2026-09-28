@@ -31,6 +31,11 @@ type
 		private
       mLastCharClass: AnsiChar;
       mFreqCounter: array of uInt32;
+      mInsideTag: Boolean;
+      mPending: array of AnsiChar;
+      mPendingLength: Integer;
+      procedure AppendPending(aChar: AnsiChar);
+      procedure ObserveByte(aChar: AnsiChar);
 		public
     	constructor Create; override;
       destructor Destroy; override;
@@ -38,6 +43,7 @@ type
       function HandleData(aBuf: pAnsiChar;  aLen: integer): eProbingState; override;
       function GetDetectedCharset: eInternalCharsetID; override;
       procedure Reset; override;
+      procedure FinishData;
       function GetConfidence: float; override;
       {$ifdef DEBUG_chardet}
       procedure DumpStatus; override;
@@ -146,6 +152,44 @@ begin
 	Result := WINDOWS_1252_CHARSET;
 end;
 
+procedure TnsLatin1Prober.AppendPending(aChar: AnsiChar);
+var
+  capacity: Integer;
+begin
+  if mPendingLength = Length(mPending) then
+    begin
+      capacity := Length(mPending);
+      if capacity < 64 then
+        capacity := 64
+      else if capacity <= High(Integer) div 2 then
+        capacity := capacity * 2
+      else
+        capacity := High(Integer);
+      SetLength(mPending, capacity);
+    end;
+  mPending[mPendingLength] := aChar;
+  Inc(mPendingLength);
+end;
+
+procedure TnsLatin1Prober.ObserveByte(aChar: AnsiChar);
+var
+  charClass: AnsiChar;
+  freq: Byte;
+begin
+  if mState = psNotMe then
+    Exit;
+  charClass := AnsiChar(Latin1_CharToClass[Byte(aChar)]);
+  freq := Latin1ClassModel[Byte(mLastCharClass) * CLASS_NUM +
+    Byte(charClass)];
+  if freq = 0 then
+    mState := psNotMe
+  else
+    begin
+      Inc(mFreqCounter[freq]);
+      mLastCharClass := charClass;
+    end;
+end;
+
 function TnsLatin1Prober.GetConfidence: float;
 var
   confidence: float;
@@ -180,41 +224,49 @@ end;
 
 function TnsLatin1Prober.HandleData(aBuf: pAnsiChar; aLen: integer): eProbingState;
 var
-  newBuf1: pAnsiChar;
-  newLen1: integer;
-  charClass: AnsiChar;
-  freq: byte;
-  i: integer;
+  i, j: Integer;
+  value: AnsiChar;
+  isDelimiter: Boolean;
 begin
   Result := inherited HandleData(aBuf, aLen);
   if Result = psNotMe then
-    exit;
-
-  newBuf1 := nil;
-  newLen1 := 0;
-  newBuf1 := AllocMem(aLen);
-  try
-    if not FilterWithEnglishLetters(aBuf,aLen,newBuf1,newLen1) then
-      begin
-        newBuf1 := aBuf;
-        newLen1 := aLen;
-      end;
-    for i := 0 to Pred(newLen1) do
-      begin
-        charClass := AnsiChar(Latin1_CharToClass[integer(newBuf1[i])]);
-        freq := Latin1ClassModel[byte(mLastCharClass) * CLASS_NUM + byte(charClass)];
-        if freq = 0 then
-          begin
-            mState:= psNotMe;
-            break;
-          end;
-        inc(mFreqCounter[freq]);
-        mLastCharClass := charClass;
-      end;
-	finally
-	  FreeMem(newBuf1, aLen);
-  end;
+    Exit;
+  for i := 0 to aLen - 1 do
+    begin
+      value := aBuf[i];
+      if value = '>' then
+        mInsideTag := False
+      else if value = '<' then
+        mInsideTag := True;
+      isDelimiter := (Byte(value) < $80) and
+        ((value < 'A') or ((value > 'Z') and (value < 'a')) or
+         (value > 'z'));
+      if isDelimiter then
+        begin
+          if (mPendingLength > 0) and not mInsideTag then
+            begin
+              for j := 0 to mPendingLength - 1 do
+                ObserveByte(mPending[j]);
+              ObserveByte(' ');
+            end;
+          mPendingLength := 0;
+        end
+      else
+        AppendPending(value);
+      if mState = psNotMe then
+        Break;
+    end;
   Result := mState;
+end;
+
+procedure TnsLatin1Prober.FinishData;
+var
+  i: Integer;
+begin
+  if not mInsideTag then
+    for i := 0 to mPendingLength - 1 do
+      ObserveByte(mPending[i]);
+  mPendingLength := 0;
 end;
 
 procedure TnsLatin1Prober.Reset;
@@ -223,6 +275,9 @@ var
 begin
   mState := psDetecting;
   mLastCharClass := AnsiChar(OTH);
+  mInsideTag := False;
+  SetLength(mPending, 0);
+  mPendingLength := 0;
   for i := 0 to Pred(FREQ_CAT_NUM) do
   	mFreqCounter[i] := 0;
 end;

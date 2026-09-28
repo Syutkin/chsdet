@@ -33,9 +33,10 @@ const
     2,2,2,2,2,2,2,2,  // d0 - d7
     2,2,2,2,2,2,2,2,  // d8 - df
     3,3,3,3,3,3,3,3,  // e0 - e7
-    3,3,3,3,3,4,4,4,  // e8 - ef
-    4,4,4,4,4,4,4,4,  // f0 - f7
-    4,4,4,4,4,0,0,0   // f8 - ff
+    3,3,3,3,3,3,3,4,  // e8 - ef
+    // Code page 932 also uses ED-EE and F0-FC as two-byte leads.
+    3,3,3,3,3,3,3,3,  // f0 - f7
+    3,3,3,3,3,0,0,0   // f8 - ff
   );
 
 	SJIS_st: array [0..23] of byte = (
@@ -72,4 +73,3 @@ const
 //  charLenTable: @SJISCharLenTable;
 //  CharsetID: SHIFT_JIS_CHARSET;
 //  );
-

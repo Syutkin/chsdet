@@ -201,6 +201,7 @@ begin
   case mInputState of
     isHighbyte:
       begin
+        TnsLatin1Prober(mCharSetProbers[2]).FinishData;
         maxProberConfidence := 0.0;
         maxProber := 0;
         for i := 0 to Pred(NUM_OF_CHARSET_PROBERS) do

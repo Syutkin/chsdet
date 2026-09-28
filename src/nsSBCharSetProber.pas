@@ -50,6 +50,7 @@ type
       mTotalChar: uInt32; (*characters that fall in our sampling range*)
       mFreqChar: uInt32; (* Optional auxiliary prober for name decision. created and destroyed by the GroupProber*)
       mNameProber: TCustomDetector;
+      mUseShortcuts: Boolean;
 
 		public
     	constructor Create(model: SequenceModel; reversed: Boolean = FALSE; nameProber: TCustomDetector = nil); reintroduce;
@@ -68,6 +69,7 @@ type
 
 		  function KeepEnglishLetters: Boolean; virtual;
 		  (* (not implemented)*)
+      property UseShortcuts: Boolean read mUseShortcuts write mUseShortcuts;
    end;
 
 implementation
@@ -105,6 +107,7 @@ begin
   mModel := model;
   mReversed := reversed;
   mNameProber := nameProber;
+  mUseShortcuts := True;
   Reset;
 end;
 
@@ -198,7 +201,7 @@ begin
         end;
       mLastOrder:= order;
     end;
-  if mState = psDetecting then
+  if mUseShortcuts and (mState = psDetecting) then
 	  if mTotalSeqs > SB_ENOUGH_REL_THRESHOLD then
       begin
         cf := GetConfidence;
