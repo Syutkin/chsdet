@@ -99,8 +99,8 @@ const
 
   AboutInfo: rAboutHolder = (
     MajorVersionNr: 0;
-    MinorVersionNr: 2;
-    BuildVersionNr: 10;
+    MinorVersionNr: 3;
+    BuildVersionNr: 0;
     About: 'Charset Detector Library. Copyright (C) 2006 - 2013, Nick Yakowlew. http://chsdet.sourceforge.net';
   );
   { TnsUniversalDetector }
@@ -514,8 +514,6 @@ begin
     BOM_UTF16_BE:  mDetectedCharset := UTF16_BE_CHARSET;
     BOM_UCS4_LE:   mDetectedCharset := UTF32_LE_CHARSET;
     BOM_UCS4_BE:   mDetectedCharset := UTF32_BE_CHARSET;
-    BOM_UCS4_2143: mDetectedCharset := UCS4_LE_CHARSET;
-    BOM_UCS4_3412: mDetectedCharset := UCS4_BE_CHARSET;
     BOM_Not_Found: ProcessData(@mBOMBuffer[0], mBOMLength);
   end;
   if mDetectedBOM <> BOM_Not_Found then

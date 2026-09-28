@@ -44,8 +44,6 @@ begin
     BOM_Not_Found: Result := 'BOM_Not_Found';
     BOM_UCS4_BE: Result := 'BOM_UCS4_BE';
     BOM_UCS4_LE: Result := 'BOM_UCS4_LE';
-    BOM_UCS4_2143: Result := 'BOM_UCS4_2143';
-    BOM_UCS4_3412: Result := 'BOM_UCS4_3412';
     BOM_UTF16_BE: Result := 'BOM_UTF16_BE';
     BOM_UTF16_LE: Result := 'BOM_UTF16_LE';
     BOM_UTF8: Result := 'BOM_UTF8';

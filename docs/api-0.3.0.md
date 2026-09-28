@@ -1,22 +1,37 @@
 # ChsDet 0.3.0 API
 
-Status: implemented API contract. The package still reports version 0.2.10
-until the release version update. The result and streaming API, charset
-profiles, and standalone examples are implemented. This document describes
-current behavior.
+`CharsetDetector` examines raw bytes and reports a likely encoding. It does
+not decode text or remove a BOM. The caller owns input streams and buffers.
 
-## Scope
+## Entry points
 
-ChsDet examines raw bytes and suggests an encoding. It does not decode text,
-strip a BOM, normalize strings, or choose an encoding from application
-settings. The caller owns those decisions and any input stream. The library
-has no LCL or external runtime dependency.
+```pascal
+function DetectCharset(const Data: RawByteString): TCharsetDetectionResult;
+```
 
-The new public unit is `CharsetDetector`. Existing clients can continue to
-use `nsUniversalDetector` and `nsCore`; see the
-[migration guide](migration-0.3.0.md).
+`DetectCharset` analyzes a complete buffer with the full charset set. For
+streaming input, use `TCharsetDetector`:
 
-## Public types and entry points
+```pascal
+Detector := TCharsetDetector.Create;
+try
+  repeat
+    Count := Stream.Read(Buffer, SizeOf(Buffer));
+    if Count > 0 then
+      Detector.Feed(@Buffer[0], Count);
+  until Count = 0;
+  Detection := Detector.Finish;
+finally
+  Detector.Free;
+end;
+```
+
+`Feed` accepts `nil, 0`. A negative count or nil pointer with a positive count
+raises `EArgumentException`. `Finish` is repeatable and returns an independent
+candidate array. `Feed` after `Finish` raises `EInvalidOp`; call `Reset` to
+start another analysis. Results are independent of caller block boundaries.
+
+## Result
 
 ```pascal
 type
@@ -50,161 +65,71 @@ type
     BytesSeen: QWord;
     IsFinal: Boolean;
   end;
-
-  TCharsetDetector = class
-  public
-    constructor Create;
-    destructor Destroy; override;
-    procedure Feed(Buffer: Pointer; Count: SizeInt);
-    function Finish: TCharsetDetectionResult;
-    procedure Reset;
-    procedure SetAllowedCharsets(const aNames: array of string);
-    procedure ClearProfile;
-  end;
-
-function DetectCharset(const Data: RawByteString): TCharsetDetectionResult;
 ```
-
-The declaration above omits private members. Free a `TCharsetDetector` that
-you create. `DetectCharset` creates and
-frees one internally, uses the full charset set, and returns the same final
-result as `Feed` followed by `Finish` on the same bytes.
-
-## Results and decisions
 
 | Status | Meaning |
 |---|---|
-| `dsDetected` | A BOM, Unicode check, ASCII check, escape detector, or sufficiently supported statistical candidate produced a choice. Detection does not validate decoding of the whole text. |
-| `dsAmbiguous` | Multiple encodings remain plausible. `Charset` is a guess, not a confirmed encoding. |
-| `dsInsufficientData` | Too little evidence for a statistical choice, including empty input. A short input may still have a leading guess. |
-| `dsUnknown` | No candidate reached the choice threshold, or no viable candidate exists. A weak guess may still be present. |
-| `dsExcludedByProfile` | A BOM, ASCII, or validated Unicode decision points to an encoding outside the allowed list. The indicated encoding is retained for diagnostics, without a candidate. |
+| `dsDetected` | The detector selected an encoding. |
+| `dsAmbiguous` | Several encodings remain plausible; `Charset` is a guess. |
+| `dsInsufficientData` | Too little evidence, including empty input; a guess may be present. |
+| `dsUnknown` | No supported choice; a weak guess may be present. |
+| `dsExcludedByProfile` | A BOM, ASCII or validated Unicode choice is outside the profile. The indicated name and BOM remain in the result; `Candidates` is empty. |
 
-For a statistical result, `Candidates` contains unique public encodings.
-`Charset`, `CodePage`, `Confidence`, and `Source` describe the selected
-candidate even when `Status` is `dsAmbiguous`, `dsInsufficientData`, or
-`dsUnknown`. Usually this is the highest scoring candidate. A
-`csConfusionResolution` decision can select the second candidate while
-preserving the original score order. If there is no guess, `Charset` is empty,
-`CodePage` is 0, and `HasConfidence` is false. Code page 0 alone is not an
-unknown marker: ASCII also uses it.
+`Charset`, `CodePage`, `Confidence` and `Source` describe the selected
+candidate even when `Status` is not `dsDetected`. If no guess exists,
+`Charset` is empty, `CodePage` is `0` and `HasConfidence` is false. ASCII also
+uses code page `0`; inspect `Status` and `Charset`.
 
-For a BOM, ASCII, or validated Unicode choice, the result contains one
-candidate with `HasConfidence = False`. A profile conflict returns the
-indicated `Charset`, `CodePage`, and `Source`, plus `BOM` and
-`BOMSize` when present; it returns no candidates and no statistical score.
-An empty input has `dsInsufficientData`, no guess, and `BytesSeen = 0`.
+`Candidates` contains distinct public encodings, sorted by descending model
+score and then name. `csConfusionResolution` may select the second candidate
+without changing that order. `Language` names the contributing model; it is
+not a language detection result.
 
-`Source` records the basis of a decision or guess:
-`csBOM`, `csASCII`, `csUTF8Validation`, `csUTF16Structure`,
-`csStatistics`, or `csConfusionResolution`. `csNone` means no basis was
-available. `Language` identifies the contributing model and is only a
-diagnostic hint, not a language detection result.
+`Confidence` is a model score from 0 to 1, not a probability. Check
+`HasConfidence`; BOM, ASCII and validated Unicode results have no score.
+Scores are not normalized. Models for the same encoding merge using their
+maximum score. Profiles do not increase scores.
 
-`Confidence` is a model score in the range 0..1, **not a calibrated
-probability**. Check `HasConfidence` before using it. Candidate scores
-are not normalized and need not sum to 1. Models for the same public encoding
-(such as Russian and Bulgarian Windows-1251) merge using their maximum score,
-not their sum. A BOM, ASCII, or Unicode validation result does not receive an
-invented score. Restricting the candidate set does not raise the remaining
-model scores.
+`BOMSize` is the detected BOM length; `BytesSeen` is the number of accepted
+input bytes. `Finish` sets `IsFinal = True`. Empty input returns
+`dsInsufficientData` with `BytesSeen = 0` and no guess.
 
 ## Selection rules
 
-- A BOM has priority. It indicates an intended encoding, but does not prove
-  that all following bytes decode correctly.
-- Without a BOM, UTF-16LE/BE structure is checked before returning ASCII.
-  ASCII-only bytes are a distinct `ASCII` result even though they are valid
-  UTF-8. Escape sequences such as HZ are checked before plain ASCII is final.
-- BOM-free UTF-8 must validate across the whole input. At least two complete
-  non-ASCII UTF-8 characters are required before preferring it to a legacy
-  encoding. An incomplete final sequence cannot establish UTF-8.
-- Statistical candidates with undefined input bytes are removed for the
-  supported single-byte encodings. A model score at or below `SURE_NO`
-  (0.01) does not create a candidate.
-- A statistical choice needs at least four input bytes and a leading score
-  of at least 0.20. A gap of 0.05 or less between the top two scores produces
-  `dsAmbiguous`, unless distinguishing-byte context resolves the pair.
-  These thresholds do not block BOM, ASCII, or structural Unicode decisions.
-- Candidates are sorted by descending score and then by public charset name
-  for a stable tie order. An exact tie does not establish the original
-  encoding.
-- ISO-8859-8 and Windows-1255 share many Hebrew-letter bytes. Without a
-  distinguishing byte, both can remain candidates and the result can be
-  `dsAmbiguous`. A unique original label cannot be recovered from bytes
-  that decode identically under both encodings.
+1. A BOM takes priority. It identifies an intended encoding but does not
+   validate the remaining bytes.
+2. Without a BOM, UTF-16LE/BE structure is checked before ASCII. Escape
+   sequences are checked before plain ASCII is final. ASCII is reported
+   separately from UTF-8.
+3. BOM-free UTF-8 must validate across the complete input. Preference over
+   legacy encodings requires at least two complete non-ASCII characters.
+4. Statistical candidates with undefined input bytes are excluded for the
+   supported single-byte encodings. A score at or below `0.01` creates no
+   candidate. A statistical choice requires at least four bytes and a score
+   of at least `0.20`.
+5. A score gap of `0.05` or less produces `dsAmbiguous` unless context around
+   distinguishing bytes resolves the pair. Shared ISO-8859-8/Windows-1255
+   bytes can remain ambiguous.
 
-## Streaming and lifecycle
+## Profiles
 
 ```pascal
-Detector := TCharsetDetector.Create;
-try
-  repeat
-    Count := Stream.Read(Buffer, SizeOf(Buffer));
-    if Count > 0 then
-      Detector.Feed(@Buffer[0], Count);
-  until Count = 0;
-  Detection := Detector.Finish;
-finally
-  Detector.Free;
-end;
+Detector.SetAllowedCharsets(['ASCII', 'UTF-8', 'UTF-16LE',
+  'UTF-16BE', 'windows-1251']);
 ```
 
-The caller owns `Stream`, keeps it open during feeding, and frees it
-separately. `Feed` does not retain the caller's buffer. It accepts
-`Feed(nil, 0)`; a negative count or nil pointer with a positive count raises
-`EArgumentException`. Internally the wrapper feeds the shared core in fixed
-512-byte blocks. It retains detector state and short unfinished sequences,
-not the entire input, and its final result does not depend on caller block
-boundaries. `BytesSeen` counts all accepted input bytes.
+Names match public charset names case insensitively. Unknown names raise
+`EArgumentException`; duplicates have no effect. An empty list allows no
+charset. `ClearProfile` restores the full set.
 
-`Finish` signals EOF, finalizes incomplete sequences, and returns
-`IsFinal = True`. Repeating `Finish` returns the same values and an
-independent candidate array. `Feed` after `Finish` raises `EInvalidOp`.
-`Reset` starts a new analysis and preserves the selected profile. The old
-API's `Done` property is not a substitute for feeding the entire input to
-the new API.
+Set or clear the profile before the first nonempty `Feed` or after `Reset`.
+Changing it after input or `Finish` raises `EInvalidOp`. `Reset` preserves the
+profile. An excluded BOM, ASCII or validated Unicode choice returns
+`dsExcludedByProfile` without a fallback statistical guess.
 
-## Explicit charset profiles
+## Existing API
 
-```pascal
-Detector := TCharsetDetector.Create;
-try
-  Detector.SetAllowedCharsets(['ASCII', 'UTF-8', 'UTF-16LE', 'UTF-16BE',
-    'windows-1251']);
-  Detector.Feed(@Buffer[0], Count);
-  Detection := Detector.Finish;
-finally
-  Detector.Free;
-end;
-```
-
-Names are the returned public charset names, matched without case
-sensitivity. Duplicate names have no additional effect. Every language
-model for an allowed public encoding is enabled; individual escape
-encodings can be selected independently. Unknown names raise
-`EArgumentException`. An empty list allows nothing; it does not restore
-full mode. Use `ClearProfile` for the default full set.
-
-Set or clear a profile before the first nonempty `Feed`, or after
-`Reset`. Changing it after input or `Finish` raises `EInvalidOp`.
-`Reset` keeps the profile. If a BOM indicates an excluded encoding, the
-result is `dsExcludedByProfile`, with the BOM and indicated name retained.
-The detector does not replace that indication with a permitted statistical
-guess. The same status applies to excluded ASCII or validated Unicode
-choices.
-
-## Compatibility and examples
-
-`TnsUniversalDetector`, `HandleData`, `DataEnd`,
-`GetDetectedCharsetInfo`, `Done`, `BOMDetected`, and
-`DisableCharset(CodePage)` remain available. The legacy result has one
-name and code page, without a confidence or ambiguity status. There is no
-exact one-to-one mapping from a new status to the old name: both APIs make
-their own decisions. See the [migration guide](migration-0.3.0.md) for
-behavior changes and ownership rules.
-
-Complete, compiled examples are in [examples/](../examples/README.md):
-`text_detect` uses `RawByteString` and `DetectCharset`;
-`file_detect` streams a file, configures a profile, and reuses the detector
-after `Reset`; `legacy_detect` retains the old API.
+`TnsUniversalDetector` in `nsUniversalDetector` remains available. Its result
+contains one charset name and code page, without status, confidence or
+candidates. See the [migration guide](migration-0.3.0.md) and
+[compiled examples](../examples/README.md).

@@ -66,10 +66,8 @@ type
 
   eBOMKind = (
     BOM_Not_Found,
-    BOM_UCS4_BE,    // 00 00 FE FF           UCS-4,    big-endian machine    (1234 order)
-    BOM_UCS4_LE,    // FF FE 00 00           UCS-4,    little-endian machine (4321 order)
-    BOM_UCS4_2143,  // 00 00 FF FE           UCS-4,    unusual octet order   (2143)
-    BOM_UCS4_3412,  // FE FF 00 00           UCS-4,    unusual octet order   (3412)
+    BOM_UCS4_BE,    // 00 00 FE FF           UTF-32, big-endian
+    BOM_UCS4_LE,    // FF FE 00 00           UTF-32, little-endian
     BOM_UTF16_BE,   // FE FF ## ##           UTF-16,   big-endian
     BOM_UTF16_LE,   // FF FE ## ##           UTF-16,   little-endian
     BOM_UTF8        // EF BB BF              UTF-8
@@ -84,8 +82,6 @@ const
     (Length: 00; BOM: (#$00, #$00, #$00, #$00)),
     (Length: 04; BOM: (#$00, #$00, #$FE, #$FF)),
     (Length: 04; BOM: (#$FF, #$FE, #$00, #$00)),
-    (Length: 04; BOM: (#$00, #$00, #$FF, #$FE)),
-    (Length: 04; BOM: (#$FE, #$FF, #$00, #$00)),
     (Length: 02; BOM: (#$FE, #$FF, #$00, #$00)),
     (Length: 02; BOM: (#$FF, #$FE, #$00, #$00)),
     (Length: 03; BOM: (#$EF, #$BB, #$BF, #$00))
@@ -100,38 +96,36 @@ type
   end;
 
   eInternalCharsetID = (
-    UNKNOWN_CHARSET           = 000,
-    PURE_ASCII_CHARSET        = 001,
-    UTF8_CHARSET              = 002,
-    UCS4_BE_CHARSET           = 003,
-    UTF16_BE_CHARSET          = 004,
-    UTF32_BE_CHARSET          = 005,
-    UCS4_LE_CHARSET           = 006,
-    UTF32_LE_CHARSET          = 007,
-    UTF16_LE_CHARSET          = 008,
-    LATIN5_BULGARIAN_CHARSET  = 009,
-    WINDOWS_BULGARIAN_CHARSET = 010,
-    KOI8_R_CHARSET            = 011,
-    WINDOWS_1251_CHARSET      = 012,
-    ISO_8859_5_CHARSET        = 013,
-    X_MAC_CYRILLIC_CHARSET    = 014,
-    IBM866_CHARSET            = 015,
-    IBM855_CHARSET            = 016,
-    ISO_8859_7_CHARSET        = 017,
-    WINDOWS_1253_CHARSET      = 018,
-    ISO_8859_8_CHARSET        = 019,
-    WINDOWS_1255_CHARSET      = 020,
-    BIG5_CHARSET              = 021,
-    ISO_2022_CN_CHARSET       = 022,
-    ISO_2022_JP_CHARSET       = 023,
-    ISO_2022_KR_CHARSET       = 024,
-    EUC_JP_CHARSET            = 025,
-    EUC_KR_CHARSET            = 026,
-    X_EUC_TW_CHARSET          = 027,
-    SHIFT_JIS_CHARSET         = 028,
-    GB18030_CHARSET           = 029,
-    HZ_GB_2312_CHARSET        = 030,
-    WINDOWS_1252_CHARSET      = 031
+    UNKNOWN_CHARSET,
+    PURE_ASCII_CHARSET,
+    UTF8_CHARSET,
+    UTF16_BE_CHARSET,
+    UTF32_BE_CHARSET,
+    UTF32_LE_CHARSET,
+    UTF16_LE_CHARSET,
+    LATIN5_BULGARIAN_CHARSET,
+    WINDOWS_BULGARIAN_CHARSET,
+    KOI8_R_CHARSET,
+    WINDOWS_1251_CHARSET,
+    ISO_8859_5_CHARSET,
+    X_MAC_CYRILLIC_CHARSET,
+    IBM866_CHARSET,
+    IBM855_CHARSET,
+    ISO_8859_7_CHARSET,
+    WINDOWS_1253_CHARSET,
+    ISO_8859_8_CHARSET,
+    WINDOWS_1255_CHARSET,
+    BIG5_CHARSET,
+    ISO_2022_CN_CHARSET,
+    ISO_2022_JP_CHARSET,
+    ISO_2022_KR_CHARSET,
+    EUC_JP_CHARSET,
+    EUC_KR_CHARSET,
+    X_EUC_TW_CHARSET,
+    SHIFT_JIS_CHARSET,
+    GB18030_CHARSET,
+    HZ_GB_2312_CHARSET,
+    WINDOWS_1252_CHARSET
   );
 
   TInternalCharsetSet = set of eInternalCharsetID;
@@ -163,12 +157,6 @@ const
       CodePage: 65001;
       Language: 'Unicode'
     ),
-  // UCS4_BE_CHARSET
-    (
-      Name: 'X-ISO-10646-UCS-4-3412';
-      CodePage: 12001;
-      Language: 'Unicode'
-    ),
   // UTF16_BE_CHARSET
     (
       Name: 'UTF-16BE';
@@ -179,12 +167,6 @@ const
     (
       Name: 'UTF-32BE';
       CodePage: 12001;
-      Language: 'Unicode'
-    ),
-  // UCS4_LE_CHARSET
-    (
-      Name: 'X-ISO-10646-UCS-4-2143';
-      CodePage: 12000;
       Language: 'Unicode'
     ),
   // UTF32_LE_CHARSET

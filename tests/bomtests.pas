@@ -37,6 +37,7 @@ type
   published
     procedure PrefixResolution;
     procedure BOMOnlyAndAllSplits;
+    procedure UTF32CodePages;
     procedure SharedBOMPrefixesAndEOF;
     procedure NonBOMPrefixIsForwardedOnce;
     procedure ResetClearsPendingBOM;
@@ -100,8 +101,6 @@ begin
   case aBOM of
     BOM_UCS4_BE: Result := UTF32_BE_CHARSET;
     BOM_UCS4_LE: Result := UTF32_LE_CHARSET;
-    BOM_UCS4_2143: Result := UCS4_LE_CHARSET;
-    BOM_UCS4_3412: Result := UCS4_BE_CHARSET;
     BOM_UTF16_BE: Result := UTF16_BE_CHARSET;
     BOM_UTF16_LE: Result := UTF16_LE_CHARSET;
     BOM_UTF8: Result := UTF8_CHARSET;
@@ -180,12 +179,33 @@ begin
     end;
 end;
 
+procedure TBOMTests.UTF32CodePages;
+var
+  detector: TnsUniversalDetector;
+  data: RawByteString;
+begin
+  detector := TnsUniversalDetector.Create;
+  try
+    data := #$FF#$FE#$00#$00;
+    detector.HandleData(PAnsiChar(data), Length(data));
+    detector.DataEnd;
+    AssertEquals('UTF-32LE', 12000, detector.GetDetectedCharsetInfo.CodePage);
+
+    detector.Reset;
+    data := #$00#$00#$FE#$FF;
+    detector.HandleData(PAnsiChar(data), Length(data));
+    detector.DataEnd;
+    AssertEquals('UTF-32BE', 12001, detector.GetDetectedCharsetInfo.CodePage);
+  finally
+    detector.Free;
+  end;
+end;
+
 procedure TBOMTests.SharedBOMPrefixesAndEOF;
 var
   detector: TnsUniversalDetector;
 begin
   CheckBOM(#$FF#$FE#$00#$00, BOM_UCS4_LE, UTF32_LE_CHARSET);
-  CheckBOM(#$FE#$FF#$00#$00, BOM_UCS4_3412, UCS4_BE_CHARSET);
   CheckBOM(#$FF#$FE#$00'X', BOM_UTF16_LE, UTF16_LE_CHARSET);
   CheckBOM(#$FE#$FF#$00'X', BOM_UTF16_BE, UTF16_BE_CHARSET);
   CheckBOM(#$FF#$FE#$00, BOM_UTF16_LE, UTF16_LE_CHARSET);

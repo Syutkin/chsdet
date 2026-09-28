@@ -43,6 +43,7 @@ type
     procedure ProfileEscapeAndBOMConflict;
     procedure ProfileLifecycleAndFullMode;
     procedure LegacyDisableCharsetCoversAllModels;
+    procedure AboutReportsReleaseVersion;
   end;
 
 function TAPITests.ReadFixture(const aName: string): RawByteString;
@@ -780,6 +781,22 @@ begin
     detected := detector.Finish;
     AssertEquals('UTF-16LE', detected.Charset);
     AssertEquals(Ord(dsDetected), Ord(detected.Status));
+  finally
+    detector.Free;
+  end;
+end;
+
+procedure TAPITests.AboutReportsReleaseVersion;
+var
+  detector: TnsUniversalDetector;
+  about: rAboutHolder;
+begin
+  detector := TnsUniversalDetector.Create;
+  try
+    detector.GetAbout(about);
+    AssertEquals(0, Integer(about.MajorVersionNr));
+    AssertEquals(3, Integer(about.MinorVersionNr));
+    AssertEquals(0, Integer(about.BuildVersionNr));
   finally
     detector.Free;
   end;
