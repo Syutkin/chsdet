@@ -2,6 +2,8 @@
 
 The test suite is built with FPC and uses FPCUnit from the Free Component
 Library.
+The runners also build and check the standalone programs in `examples/`
+after FPCUnit passes.
 
 Run all tests from the repository root:
 

@@ -27,4 +27,6 @@ fpc ^
 if errorlevel 1 exit /b %errorlevel%
 
 "%build_directory%\chsdettests.exe" %*
+if errorlevel 1 exit /b %errorlevel%
+call "%repository_root%\examples\run-examples.cmd"
 exit /b %errorlevel%

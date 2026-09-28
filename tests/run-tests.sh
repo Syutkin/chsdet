@@ -24,3 +24,4 @@ fpc \
   "$repository_root/tests/runtests.pas"
 
 "$build_directory/chsdettests" "$@"
+"$repository_root/examples/run-examples.sh"

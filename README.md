@@ -1,5 +1,7 @@
 # Charset Detector
 
+Standalone FPC examples and commands are in [examples/README.md](examples/README.md).
+
 ## Summary
 
 Charset Detector - as the name says - is a stand alone component for automatic charset detection of a given text.

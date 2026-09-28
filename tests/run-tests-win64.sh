@@ -24,4 +24,5 @@ mkdir -p "$unit_directory"
   -o"$build_directory/chsdettests.exe" \
   -B "$repository_root/tests/runtests.pas"
 
-exec wine "$build_directory/chsdettests.exe" "$@"
+wine "$build_directory/chsdettests.exe" "$@"
+"$repository_root/examples/run-examples-win64.sh"
