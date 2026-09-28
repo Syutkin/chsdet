@@ -78,8 +78,8 @@ lazbuild --ws=qt6 chsdet.lpk
 The test runner also builds and checks the examples. On Windows use
 `tests\run-tests.cmd --format=plain --sparse`. The package needs no LCL
 runtime dependency; standalone FPC clients add `src/` and `src/sbseq/` to
-their unit search path. See [test instructions](tests/README.md) for research
-mode and Win64 cross-builds.
+their unit search path. See [test instructions](tests/README.md) for fixture
+audits and Win64 cross-builds.
 
 ## Origin and license
 

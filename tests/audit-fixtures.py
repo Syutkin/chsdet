@@ -29,12 +29,7 @@ def audit(root):
             lf_path = root / stem.replace("-crlf.txt", "-lf.txt")
             if decoded.replace("\r\n", "\n") != lf_path.read_bytes().decode(codec):
                 raise ValueError(f"LF/CRLF text differs: {stem}")
-        shared = ""
-        if stem.startswith("iso-8859-8-shared-"):
-            if decoded != data.decode("cp1255", errors="strict"):
-                raise ValueError(f"Not shared Hebrew text: {stem}")
-            shared = "windows-1255"
-        elif stem.startswith("iso-8859-8-"):
+        if stem.startswith("iso-8859-8-"):
             try:
                 data.decode("cp1255", errors="strict")
             except UnicodeDecodeError:
@@ -43,7 +38,7 @@ def audit(root):
                 raise ValueError(f"ISO-8859-8 bytes also decode as Windows-1255: {stem}")
         digest = hashlib.sha256(data).hexdigest()
         by_hash.setdefault(digest, []).append(stem)
-        rows.append((stem, len(data), digest, codec, shared))
+        rows.append((stem, len(data), digest, codec))
     if not rows:
         raise ValueError(f"No fixtures found in {root}")
     return rows, [names for names in by_hash.values() if len(names) > 1]
@@ -56,7 +51,7 @@ def main():
     rows, duplicates = audit(Path(__file__).resolve().parent / "fixtures/encodings")
     with args.output.open("w", encoding="utf-8", newline="") as output:
         writer = csv.writer(output, delimiter="\t", lineterminator="\n")
-        writer.writerow(("fixture", "bytes", "sha256", "codec", "equivalent_codec"))
+        writer.writerow(("fixture", "bytes", "sha256", "codec"))
         writer.writerows(rows)
     print(f"Fixtures: {len(rows)}; identical-byte groups: {len(duplicates)}")
     for names in duplicates:

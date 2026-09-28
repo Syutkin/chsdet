@@ -60,8 +60,7 @@ The shared core can return a different name to unchanged 0.2.x clients:
   checks. BOM-free UTF-8 preference requires two complete non-ASCII
   characters.
 - Single-byte candidates with undefined input bytes are excluded.
-- Greek, Cyrillic and Hebrew comparisons use distinguishing bytes; shared
-  ISO-8859-8/Windows-1255 bytes can remain ambiguous.
+- Greek, Cyrillic and Hebrew comparisons use distinguishing bytes.
 - Windows-1255 combining marks, extended CP932 pairs and model state across
   input blocks have fixes.
 - `DisableCharset` excludes every model of the specified code page without

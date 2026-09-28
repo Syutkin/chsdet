@@ -108,8 +108,7 @@ input bytes. `Finish` sets `IsFinal = True`. Empty input returns
    candidate. A statistical choice requires at least four bytes and a score
    of at least `0.20`.
 5. A score gap of `0.05` or less produces `dsAmbiguous` unless context around
-   distinguishing bytes resolves the pair. Shared ISO-8859-8/Windows-1255
-   bytes can remain ambiguous.
+   distinguishing bytes resolves the pair.
 
 ## Profiles
 

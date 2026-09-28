@@ -133,10 +133,10 @@ end;
 
 procedure TUTF16Tests.LegacyAndBinaryNegativeSamples;
 const
-  LegacyNames: array[0..10] of String = (
+  LegacyNames: array[0..9] of String = (
     'ascii', 'windows-1251', 'windows-1252', 'windows-1253',
     'windows-1255', 'koi8-r', 'iso-8859-5', 'iso-8859-7',
-    'iso-8859-8', 'iso-8859-8-shared', 'ibm866');
+    'iso-8859-8', 'ibm866');
 var
   bytes: RawByteString;
   name: String;

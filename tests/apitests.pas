@@ -46,6 +46,13 @@ type
     procedure AboutReportsReleaseVersion;
   end;
 
+function AmbiguousHebrewSample: RawByteString;
+begin
+  Result := #$E3#$E2' '#$F1#$F7#$F8#$EF' '#$F9#$E8' '#$E1#$E9#$ED' '+
+    #$EE#$E0#$E5#$EB#$E6#$E1' '#$E5#$EC#$F4#$FA#$F2' '#$EE#$F6#$E0' '+
+    #$EC#$E5' '#$E7#$E1#$F8#$E4'.'#10;
+end;
+
 function TAPITests.ReadFixture(const aName: string): RawByteString;
 var
   stream: TFileStream;
@@ -135,7 +142,7 @@ begin
   AssertTrue(FindCandidate(detected, 'windows-1255') >= 0);
   AssertEquals(-1, FindCandidate(detected, 'ISO-8859-8'));
 
-  detected := DetectCharset(ReadFixture('iso-8859-8-shared-lf.txt'));
+  detected := DetectCharset(AmbiguousHebrewSample);
   AssertEquals(Ord(dsAmbiguous), Ord(detected.Status));
   AssertTrue(FindCandidate(detected, 'ISO-8859-8') >= 0);
   AssertTrue(FindCandidate(detected, 'windows-1255') >= 0);
@@ -439,7 +446,7 @@ begin
   finally
     detector.Free;
   end;
-  AssertTrue('expected the complete fixture corpus', tested >= 164);
+  AssertTrue('expected the complete fixture corpus', tested >= 160);
 end;
 
 procedure TAPITests.CrossesInternalBlocks;
@@ -545,7 +552,7 @@ const
   Files: array[0..5] of string = (
     'ascii-lf.txt', 'utf-8-ru-lf.txt', 'utf-16le-fr-crlf.txt',
     'utf-16be-he-lf.txt', 'windows-1251-lf.txt',
-    'iso-8859-8-shared-lf.txt');
+    'iso-8859-8-lf.txt');
 var
   detector: TCharsetDetector;
   data: RawByteString;
@@ -608,7 +615,7 @@ begin
   AssertEquals('Russian and Bulgarian models merge', 1, count);
   AssertTrue(FindCandidate(detected, 'x-mac-cyrillic') >= 0);
 
-  data := ReadFixture('iso-8859-8-shared-lf.txt');
+  data := AmbiguousHebrewSample;
   detected := DetectCharset(data);
   AssertEquals(Ord(dsAmbiguous), Ord(detected.Status));
   AssertTrue('ambiguous result has a leading candidate',
@@ -714,7 +721,7 @@ begin
       fullResult.Candidates[0].Confidence) < 1e-12);
 
     detector.Reset;
-    data := ReadFixture('iso-8859-8-shared-lf.txt');
+    data := AmbiguousHebrewSample;
     detector.SetAllowedCharsets(['ISO-8859-8']);
     detector.Feed(Pointer(data), Length(data));
     limited := detector.Finish;

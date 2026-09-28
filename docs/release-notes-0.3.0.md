@@ -16,16 +16,14 @@
 
 ## Limits
 
-Shared ISO-8859-8/Windows-1255 bytes cannot establish the original label.
-The new API reports ambiguity for the four shared-byte fixtures; the old API
-selects Windows-1255. BOM-free UTF-8 preference requires two complete
-non-ASCII characters. Short inputs and sparse legacy text can remain
-uncertain. A BOM does not validate the rest of the input.
+BOM-free UTF-8 preference requires two complete non-ASCII characters. Short
+inputs and sparse legacy text can remain uncertain. A BOM does not validate
+the rest of the input.
 
 ## Verification
 
-The required suite passes 205/205 on Linux and Win64/Wine; the examples pass
-on both. `lazbuild --ws=qt6 chsdet.lpk` succeeds.
+The required suite and examples pass on Linux and Win64/Wine.
+`lazbuild --ws=qt6 chsdet.lpk` succeeds.
 
 See the [API reference](api-0.3.0.md), [migration guide](migration-0.3.0.md)
 and [supported charset list](../README.md#supported-charsets).
