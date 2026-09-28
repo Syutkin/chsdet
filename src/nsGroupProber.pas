@@ -116,9 +116,12 @@ begin
 
       if mProberStates[i] = psFoundIt then
         begin
-          mBestGuess := i;
+          { Let later models analyze the buffer that produced the first match.
+            A large one-shot input would otherwise leave them at their
+            initial confidence. }
+          if mBestGuess < 0 then
+            mBestGuess := i;
           mState := psFoundIt;
-          break;
         end
       else
         if mProberStates[i] = psNotMe then

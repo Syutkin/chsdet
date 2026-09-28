@@ -269,8 +269,6 @@ begin
         (mDetectedCharset <> secondCharset) then
         Continue;
       decision := mConfusion.Decide(pair);
-      if decision = cdNoEvidence then
-        Continue;
       firstScore := 0;
       secondScore := 0;
       otherScore := 0;
@@ -303,8 +301,17 @@ begin
         Continue;
       if decision = cdFirst then
         mDetectedCharset := firstCharset
-      else
+      else if decision = cdSecond then
         mDetectedCharset := secondCharset;
+      { When context abstains, use the stronger completed model instead of
+        the first prober that happened to reach psFoundIt. }
+      if decision = cdNoEvidence then
+        begin
+          if firstScore > secondScore then
+            mDetectedCharset := firstCharset
+          else if secondScore > firstScore then
+            mDetectedCharset := secondCharset;
+        end;
       Exit;
     end;
 end;

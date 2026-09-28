@@ -29,6 +29,7 @@ type
     procedure InvalidHebrewCandidatesAreExcluded;
     procedure HebrewWithCombiningMarks;
     procedure HZAcrossChunksAndPlainASCII;
+    procedure LegacyGreekOneShotUsesAllModels;
     procedure ConfusionResolutionUsesDistinguishingBytes;
     procedure FinishResetAndInvalidFeed;
     procedure ExistingDetectorRemainsUsable;
@@ -168,6 +169,37 @@ begin
     AssertEquals('ASCII', DetectCharset(plain).Charset);
   finally
     detector.Free;
+    legacy.Free;
+  end;
+end;
+
+procedure TAPITests.LegacyGreekOneShotUsesAllModels;
+const
+  { Windows-1253: a Greek diacritic, capital alpha with tonos, and a sentence.
+    Both Greek encodings can decode these bytes, but their readings differ. }
+  GreekLine: RawByteString =
+    #$A1' '#$A2' '#$C1#$F5#$F4#$E7' '#$E5#$E9#$ED#$E1#$E9' ' +
+    #$E4#$EF#$EA#$E9#$EC#$E7' '#$E1#$F0#$EB#$EF#$F5' ' +
+    #$E5#$EB#$EB#$E7#$ED#$E9#$EA#$EF#$F5' ' +
+    #$EA#$E5#$E9#$EC#$E5#$ED#$EF#$F5'. ';
+var
+  data: RawByteString;
+  legacy: TnsUniversalDetector;
+  detected: TCharsetDetectionResult;
+  i: Integer;
+begin
+  data := '';
+  for i := 1 to 140 do
+    data := data + GreekLine;
+  legacy := TnsUniversalDetector.Create;
+  try
+    legacy.HandleData(PAnsiChar(data), Length(data));
+    legacy.DataEnd;
+    detected := DetectCharset(data);
+    AssertEquals('windows-1253', detected.Charset);
+    AssertEquals(detected.Charset,
+      String(legacy.GetDetectedCharsetInfo.Name));
+  finally
     legacy.Free;
   end;
 end;
