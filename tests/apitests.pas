@@ -503,6 +503,11 @@ begin
   AssertEquals(Ord(csUTF8Validation), Ord(detected.Source));
   AssertFalse(detected.HasConfidence);
 
+  detected := DetectCharset('caf' + #$C3#$A9);
+  AssertEquals('UTF-8', detected.Charset);
+  AssertEquals(Ord(csUTF8Validation), Ord(detected.Source));
+  AssertFalse(detected.HasConfidence);
+
   detected := DetectCharset(ReadFixture('utf-16be-en-lf.txt'));
   AssertEquals('UTF-16BE', detected.Charset);
   AssertEquals(Ord(csUTF16Structure), Ord(detected.Source));

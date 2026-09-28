@@ -101,8 +101,8 @@ input bytes. `Finish` sets `IsFinal = True`. Empty input returns
 2. Without a BOM, UTF-16LE/BE structure is checked before ASCII. Escape
    sequences are checked before plain ASCII is final. ASCII is reported
    separately from UTF-8.
-3. BOM-free UTF-8 must validate across the complete input. Preference over
-   legacy encodings requires at least two complete non-ASCII characters.
+3. BOM-free UTF-8 must validate across the complete input. One complete
+   non-ASCII character is enough to prefer it over legacy encodings.
 4. Statistical candidates with undefined input bytes are excluded for the
    supported single-byte encodings. A score at or below `0.01` creates no
    candidate. A statistical choice requires at least four bytes and a score

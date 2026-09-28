@@ -139,7 +139,7 @@ begin
     Result := csASCII
   else if mDetectedCharset = UTF8_CHARSET then
     begin
-      if mUTF8.Finish and (mUTF8.MultibyteCount >= 2) and
+      if mUTF8.Finish and (mUTF8.MultibyteCount >= 1) and
         not mUTF8.HasNUL then
         Result := csUTF8Validation
       else

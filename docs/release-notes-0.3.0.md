@@ -16,9 +16,9 @@
 
 ## Limits
 
-BOM-free UTF-8 preference requires two complete non-ASCII characters. Short
-inputs and sparse legacy text can remain uncertain. A BOM does not validate
-the rest of the input.
+BOM-free UTF-8 preference requires one complete non-ASCII character. A single
+valid sequence can also occur in legacy text, so short inputs can be
+misclassified. A BOM does not validate the rest of the input.
 
 ## Verification
 

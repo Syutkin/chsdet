@@ -142,8 +142,7 @@ begin
   AssertTrue(Detect(#$80, 1) <> 'ASCII');
   AssertTrue(Detect(#$A0, 1) <> 'ASCII');
   AssertEquals('UTF-8', Detect('prefix ' + #$C3#$A9#$C3#$A0, 8));
-  AssertTrue('one accented character is weak evidence',
-    Detect(#$C3#$A9, 1) <> 'UTF-8');
+  AssertEquals('UTF-8', Detect(#$C3#$A9, 1));
 end;
 
 procedure TUTF8Tests.InvalidUTF8CannotWinAfterAnEarlyPrefix;

@@ -184,10 +184,9 @@ begin
       Exit;
     end;
 
-  { Validity alone is weak evidence on short byte strings. Two complete
-    non-ASCII characters are needed to prefer UTF-8 to legacy encodings. }
+  { A complete non-ASCII character is enough to prefer valid UTF-8. }
   utf8Ready := not mUTF8.HasNUL and mUTF8.Finish and
-    (mUTF8.MultibyteCount >= 2);
+    (mUTF8.MultibyteCount >= 1);
   if utf8Ready then
     begin
       mDetectedCharset := UTF8_CHARSET;

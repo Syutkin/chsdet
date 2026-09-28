@@ -57,8 +57,8 @@ The shared core can return a different name to unchanged 0.2.x clients:
 
 - BOM, HZ and ISO-2022 sequences are recognized across input blocks.
 - ASCII, strict whole-input UTF-8 and BOM-free UTF-16LE/BE have explicit
-  checks. BOM-free UTF-8 preference requires two complete non-ASCII
-  characters.
+  checks. BOM-free UTF-8 preference requires one complete non-ASCII
+  character.
 - Single-byte candidates with undefined input bytes are excluded.
 - Greek, Cyrillic and Hebrew comparisons use distinguishing bytes.
 - Windows-1255 combining marks, extended CP932 pairs and model state across
