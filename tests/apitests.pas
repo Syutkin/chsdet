@@ -30,6 +30,7 @@ type
     procedure HebrewWithCombiningMarks;
     procedure HZAcrossChunksAndPlainASCII;
     procedure LegacyGreekOneShotUsesAllModels;
+    procedure LegacyBulgarianModelCanChooseMacCyrillic;
     procedure ConfusionResolutionUsesDistinguishingBytes;
     procedure FinishResetAndInvalidFeed;
     procedure ExistingDetectorRemainsUsable;
@@ -197,6 +198,29 @@ begin
     legacy.DataEnd;
     detected := DetectCharset(data);
     AssertEquals('windows-1253', detected.Charset);
+    AssertEquals(detected.Charset,
+      String(legacy.GetDetectedCharsetInfo.Name));
+  finally
+    legacy.Free;
+  end;
+end;
+
+procedure TAPITests.LegacyBulgarianModelCanChooseMacCyrillic;
+var
+  data: RawByteString;
+  legacy: TnsUniversalDetector;
+  detected: TCharsetDetectionResult;
+begin
+  { Original Bulgarian sentences encoded as Mac Cyrillic. The Bulgarian
+    Windows-1251 model scores highest, but the distinguishing bytes favor Mac. }
+  data := ReadFixture('../context/mac-cyrillic-bg.txt');
+  legacy := TnsUniversalDetector.Create;
+  try
+    legacy.HandleData(PAnsiChar(data), Length(data));
+    legacy.DataEnd;
+    detected := DetectCharset(data);
+    AssertEquals(Ord(dsDetected), Ord(detected.Status));
+    AssertEquals('x-mac-cyrillic', detected.Charset);
     AssertEquals(detected.Charset,
       String(legacy.GetDetectedCharsetInfo.Name));
   finally

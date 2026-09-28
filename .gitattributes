@@ -1,3 +1,4 @@
 tests/fixtures/encodings/*.txt binary
+tests/fixtures/context/*.txt binary
 tests/corpus/alexeydott-chsdet/data/* binary
 *.cmd text eol=crlf

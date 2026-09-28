@@ -246,7 +246,7 @@ procedure TnsUniversalDetector.RefineStatisticalChoice;
 var
   pair: TConfusionPair;
   decision: TConfusionDecision;
-  firstCharset, secondCharset: eInternalCharsetID;
+  firstCharset, firstAlias, secondCharset: eInternalCharsetID;
   firstScore, secondScore, otherScore: float;
   scores: TCharsetModelScores;
   i, j: integer;
@@ -257,15 +257,19 @@ begin
         cpGreek:
           begin
             firstCharset := WINDOWS_1253_CHARSET;
+            firstAlias := firstCharset;
             secondCharset := ISO_8859_7_CHARSET;
           end;
         cpCyrillic:
           begin
             firstCharset := WINDOWS_1251_CHARSET;
+            { The Bulgarian model has its own ID but the same charset name. }
+            firstAlias := WINDOWS_BULGARIAN_CHARSET;
             secondCharset := X_MAC_CYRILLIC_CHARSET;
           end;
       end;
       if (mDetectedCharset <> firstCharset) and
+        (mDetectedCharset <> firstAlias) and
         (mDetectedCharset <> secondCharset) then
         Continue;
       decision := mConfusion.Decide(pair);
@@ -281,7 +285,8 @@ begin
                 not SingleByteCharsetCanDecode(scores[j].CharsetID,
                   mSeenBytes) then
                 Continue;
-              if scores[j].CharsetID = firstCharset then
+              if (scores[j].CharsetID = firstCharset) or
+                (scores[j].CharsetID = firstAlias) then
                 begin
                   if scores[j].Confidence > firstScore then
                     firstScore := scores[j].Confidence;
