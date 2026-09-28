@@ -45,6 +45,7 @@ type
       function HandleData(aBuf: pAnsiChar;  aLen: integer): eProbingState; override;
       function GetDetectedCharset: eInternalCharsetID; override;
       function GetConfidence: float; override;
+      function GetModelScores: TCharsetModelScores; override;
       function EnableCharset(Charset: eInternalCharsetID; NewValue: Boolean): Boolean;
 		  {$ifdef DEBUG_chardet}
   		procedure DumpStatus(Dump: string); override;
@@ -212,6 +213,25 @@ begin
   Result := confidence;
 end;
 
+function TnsGroupProber.GetModelScores: TCharsetModelScores;
+var
+  childScores: TCharsetModelScores;
+  i, j, first: integer;
+begin
+  Result := nil;
+  SetLength(Result, 0);
+  for i := 0 to Pred(mNumOfProbers) do
+    begin
+      if not mIsActive[i] or (mProbers[i] = nil) then
+        Continue;
+      childScores := mProbers[i].GetModelScores;
+      first := Length(Result);
+      SetLength(Result, first + Length(childScores));
+      for j := 0 to High(childScores) do
+        Result[first + j] := childScores[j];
+    end;
+end;
+
 function TnsGroupProber.EnableCharset(Charset: eInternalCharsetID; NewValue: Boolean): Boolean;
 var
   i: integer;
@@ -246,4 +266,3 @@ end;
 {$endif}
 
 end.
-

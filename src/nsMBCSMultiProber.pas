@@ -47,6 +47,7 @@ type
       destructor Destroy; override;
 		  function HandleData(aBuf: pAnsiChar; aLen: integer): eProbingState; override;
       function GetConfidence: double; override;
+      function GetModelScores: TCharsetModelScores; override;
       function GetDetectedCharset: eInternalCharsetID; override;
       procedure Reset; override;
       {$ifdef DEBUG_chardet}
@@ -330,6 +331,29 @@ begin
         Result := confidence;
       end;
   end;
+end;
+
+function TnsMBCSMultiProber.GetModelScores: TCharsetModelScores;
+var
+  i, count: integer;
+begin
+  Result := nil;
+  SetLength(Result, mCharsetsCount);
+  count := 0;
+  for i := 0 to Pred(mCharsetsCount) do
+    begin
+      if not mCodingSM[i].Enabled or (mSMState[i] = psNotMe) or
+        (mDistributionAnalysis[i] = nil) then
+        Continue;
+      Result[count].CharsetID := mCodingSM[i].GetCharsetID;
+      Result[count].State := mSMState[i];
+      if mSMState[i] = psFoundIt then
+        Result[count].Confidence := SURE_YES
+      else
+        Result[count].Confidence := GetConfidenceFor(i);
+      Inc(count);
+    end;
+  SetLength(Result, count);
 end;
 
 function TnsMBCSMultiProber.GetDetectedCharset: eInternalCharsetID;

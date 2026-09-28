@@ -34,6 +34,35 @@ an incomplete final sequence. At least two complete non-ASCII UTF-8 characters
 are required to prefer UTF-8 to a legacy encoding. Valid ASCII is returned as
 ASCII, not UTF-8. Short or structurally ambiguous UTF-16 may remain Unknown.
 
+-----------Detection API under development
+The CharsetDetector unit adds two ways to obtain the same final result:
+
+  Detection := DetectCharset(Data); // Data is RawByteString
+
+  Detector := TCharsetDetector.Create;
+  try
+    Detector.Feed(Buffer, Count); // repeat for each block
+    Detection := Detector.Finish;
+  finally
+    Detector.Free;
+  end;
+
+The result includes Status, Charset, CodePage, Source, BOM/BOMSize, BytesSeen,
+IsFinal, and ranked Candidates. When a statistical candidate exists, Charset,
+CodePage, and Confidence contain the leading guess even for dsAmbiguous,
+dsInsufficientData, or dsUnknown; Status indicates whether it is reliable.
+An empty input or input with no viable candidate has no charset guess.
+Statistical confidence is an algorithm score, not a probability. Candidates
+with the same charset are merged using the maximum model score. BOM, ASCII,
+and validated Unicode do not receive an invented statistical confidence.
+
+Feed(nil, 0) is allowed. Feed after Finish raises EInvalidOp; Reset starts a new
+analysis. Finish is repeatable. The streaming class uses fixed 512-byte blocks
+inside the shared detector, so caller block boundaries do not change the
+result and the entire input is never stored. An application can read a TStream
+in blocks and call Feed; the detector does not take ownership of the stream.
+Charset profiles are planned for a later stage of the 0.3.0 API.
+
 -----------Licence
 Charset Detector is open source project and distributed under GNU LGPL.
 See the GNU Lesser General Public License for more details - https://opensource.org/licenses/LGPL-2.1

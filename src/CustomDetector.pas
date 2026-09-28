@@ -21,6 +21,7 @@ type
 		  function HandleData(aBuf: pAnsiChar;  aLen: integer): eProbingState; virtual;
 		  function GetState: eProbingState; virtual;
       function GetConfidence: float; virtual; abstract;
+      function GetModelScores: TCharsetModelScores; virtual;
 			procedure Reset; virtual;
 		  {$ifdef DEBUG_chardet}
   		procedure DumpStatus(Dump: string); virtual;
@@ -66,6 +67,23 @@ begin
   mState := psDetecting;
 end;
 
+function TCustomDetector.GetModelScores: TCharsetModelScores;
+var
+  charset: eInternalCharsetID;
+begin
+  Result := nil;
+  SetLength(Result, 0);
+  if not Enabled or (GetState = psNotMe) then
+    Exit;
+  charset := GetDetectedCharset;
+  if charset = UNKNOWN_CHARSET then
+    Exit;
+  SetLength(Result, 1);
+  Result[0].CharsetID := charset;
+  Result[0].Confidence := GetConfidence;
+  Result[0].State := GetState;
+end;
+
 {$ifdef DEBUG_chardet}
 procedure TCustomDetector.DumpStatus(Dump: string);
 begin
@@ -74,6 +92,4 @@ end;
 {$endif}
 
 end.
-
-
 

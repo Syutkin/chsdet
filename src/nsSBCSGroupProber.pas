@@ -30,6 +30,7 @@ type
 		public
       constructor Create; reintroduce;
       function HandleData(aBuf: pAnsiChar;  aLen: integer): eProbingState; override;
+      function GetModelScores: TCharsetModelScores; override;
 //      {$ifdef DEBUG_chardet}
 //      procedure DumpStatus; override;
 //      {$endif}
@@ -117,6 +118,32 @@ begin
     FreeMem(newBuf1, aLen);
   end;
   Result:= mState;
+end;
+
+function TnsSBCSGroupProber.GetModelScores: TCharsetModelScores;
+var
+  i, count: integer;
+begin
+  Result := nil;
+  SetLength(Result, mNumOfProbers);
+  count := 0;
+  for i := 0 to Pred(mNumOfProbers) do
+    begin
+      { Index 10 only selects the Hebrew name; 11 and 12 are the logical
+        Windows and visual ISO models, respectively. }
+      if (i = 10) or not mIsActive[i] or (mProbers[i] = nil) or
+        (mProberStates[i] = psNotMe) then
+        Continue;
+      case i of
+        11: Result[count].CharsetID := WINDOWS_1255_CHARSET;
+        12: Result[count].CharsetID := ISO_8859_8_CHARSET;
+        else Result[count].CharsetID := mProbers[i].GetDetectedCharset;
+      end;
+      Result[count].Confidence := mProbers[i].GetConfidence;
+      Result[count].State := mProberStates[i];
+      Inc(count);
+    end;
+  SetLength(Result, count);
 end;
 
 {$ifdef DEBUG_chardet}

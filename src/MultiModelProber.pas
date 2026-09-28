@@ -29,6 +29,7 @@ type
   		procedure DumpStatus(Dump: string); override;
 		  {$endif}
       function GetConfidence: float; override;
+      function GetModelScores: TCharsetModelScores; override;
   end;
 
 
@@ -182,6 +183,33 @@ begin
     psFoundIt: Result := SURE_YES;
     else Result := SURE_NO;
   end;
+end;
+
+function TMultiModelProber.GetModelScores: TCharsetModelScores;
+var
+  i, count: integer;
+begin
+  Result := nil;
+  SetLength(Result, mCharsetsCount);
+  count := 0;
+  for i := 0 to Pred(mCharsetsCount) do
+    begin
+      if not mCodingSM[i].Enabled or (mSMState[i] = psNotMe) then
+        Continue;
+      Result[count].CharsetID := mCodingSM[i].GetCharsetID;
+      Result[count].State := mSMState[i];
+      if (mSMState[i] = psFoundIt) or
+        ((mState = psFoundIt) and
+         (Result[count].CharsetID = mDetectedCharset)) then
+        begin
+          Result[count].State := psFoundIt;
+          Result[count].Confidence := SURE_YES;
+        end
+      else
+        Result[count].Confidence := SURE_NO;
+      Inc(count);
+    end;
+  SetLength(Result, count);
 end;
 
 {$ifdef DEBUG_chardet}

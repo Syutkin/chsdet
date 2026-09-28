@@ -134,6 +134,13 @@ type
     WINDOWS_1252_CHARSET      = 031
   );
 
+  TCharsetModelScore = record
+    CharsetID: eInternalCharsetID;
+    Confidence: float;
+    State: eProbingState;
+  end;
+  TCharsetModelScores = array of TCharsetModelScore;
+
 const
   KNOWN_CHARSETS: array [eInternalCharsetID] of rCharsetInfo = (
 	// UNKNOWN_CHARSET
