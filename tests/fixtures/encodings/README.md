@@ -23,7 +23,12 @@ their byte encoding or line endings.
 The Russian pangram is used for Cyrillic encodings. UTF-8 English contains
 non-ASCII typographic punctuation. Windows-1253 contains Greek characters
 whose byte positions differ from ISO-8859-7, and Windows-1255 contains Hebrew
-vowel points absent from ISO-8859-8. Every recognition assertion expects the
-exact charset named by the fixture; alternative results are test failures.
-UTF-16 without a BOM is also expected to be recognized as the exact UTF-16
-byte order.
+vowel points absent from ISO-8859-8. The four exact-label ISO-8859-8 fixtures
+contain byte DF (double low line), which Windows-1255 cannot decode.
+Recognition assertions expect the exact charset named by the fixture, except
+for four `iso-8859-8-shared` fixtures containing only the shared ASCII/Hebrew-
+letter repertoire: the legacy API may report ISO-8859-8 or Windows-1255
+because both decode those bytes to the same text.
+The original exact-label assertions remain available with
+`CHSDET_STRICT_FIXTURES=1`; see [test policy](../../README.md).
+UTF-16 without a BOM is expected to be recognized as the exact byte order.
