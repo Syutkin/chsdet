@@ -3,4 +3,4 @@
 /lib/
 /tests/.test_build/
 /tests/work/
-/docs/
+/tests/baseline/

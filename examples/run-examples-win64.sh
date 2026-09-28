@@ -54,6 +54,13 @@ check_line "$output" 'Charset: windows-1251'
 ascii_file="$(winepath -w "$repository_root/tests/fixtures/encodings/ascii-lf.txt" | tr -d '\r')"
 output="$(wine "$build_directory/legacy_detect.exe" "$ascii_file" | tr -d '\r')"
 check_line "$output" 'Charset: ASCII'
+output="$(wine "$build_directory/legacy_detect.exe" "$cyrillic_file" | tr -d '\r')"
+check_line "$output" 'Charset: windows-1251'
+output="$(wine "$build_directory/legacy_detect.exe" "$cyrillic_file" 1251 | tr -d '\r')"
+if grep -Fqx 'Charset: windows-1251' <<< "$output"; then
+  echo 'Disabled legacy code page was selected' >&2
+  exit 1
+fi
 
 if wine "$build_directory/file_detect.exe" 'Z:\missing-chsdet-example-file' \
   >/dev/null 2>&1; then

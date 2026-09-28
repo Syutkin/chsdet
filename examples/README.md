@@ -85,7 +85,9 @@ exit with code 2.
 
 This program uses `TnsUniversalDetector.HandleData`, `DataEnd` and
 `GetDetectedCharsetInfo`; the sample prints `Charset: ASCII` and `Code page:
-0`. It reads the file in blocks and frees the stream and detector. Existing
+0`. An optional second argument calls `DisableCharset` with a numeric code
+page before reading, for example `legacy_detect file.txt 1251`. It reads the
+file in blocks and frees the stream and detector. Existing
 clients can continue using this API while new clients use `TCharsetDetector`.
 
 These examples detect an encoding name. They do not decode input bytes; the

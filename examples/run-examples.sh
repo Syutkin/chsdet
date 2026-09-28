@@ -53,6 +53,16 @@ output="$($build_directory/legacy_detect \
   "$repository_root/tests/fixtures/encodings/ascii-lf.txt")"
 check_line "$output" 'Charset: ASCII'
 
+output="$($build_directory/legacy_detect \
+  "$repository_root/tests/fixtures/encodings/windows-1251-long-lf.txt")"
+check_line "$output" 'Charset: windows-1251'
+output="$($build_directory/legacy_detect \
+  "$repository_root/tests/fixtures/encodings/windows-1251-long-lf.txt" 1251)"
+if grep -Fqx 'Charset: windows-1251' <<< "$output"; then
+  echo 'Disabled legacy code page was selected' >&2
+  exit 1
+fi
+
 if "$build_directory/file_detect" "$build_directory/missing-file" \
   >/dev/null 2>&1; then
   echo 'Missing file unexpectedly succeeded' >&2

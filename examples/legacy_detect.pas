@@ -13,13 +13,16 @@ var
   info: rCharsetInfo;
 begin
   try
-    if ParamCount <> 1 then
-      raise EArgumentException.Create('Usage: legacy_detect <path>');
+    if (ParamCount < 1) or (ParamCount > 2) then
+      raise EArgumentException.Create(
+        'Usage: legacy_detect <path> [disabled-code-page]');
     stream := TFileStream.Create(ParamStr(1), fmOpenRead or fmShareDenyWrite);
     try
       detector := TnsUniversalDetector.Create;
       try
         detector.Reset;
+        if ParamCount = 2 then
+          detector.DisableCharset(StrToInt(ParamStr(2)));
         repeat
           count := stream.Read(buffer, SizeOf(buffer));
           if count > 0 then

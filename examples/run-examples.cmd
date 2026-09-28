@@ -45,6 +45,14 @@ if errorlevel 1 exit /b 1
 if errorlevel 1 exit /b 1
 findstr /X /C:"Charset: ASCII" "%build_directory%\result.txt" >nul
 if errorlevel 1 exit /b 1
+"%build_directory%\legacy_detect.exe" "%repository_root%\tests\fixtures\encodings\windows-1251-long-lf.txt" > "%build_directory%\result.txt"
+if errorlevel 1 exit /b 1
+findstr /X /C:"Charset: windows-1251" "%build_directory%\result.txt" >nul
+if errorlevel 1 exit /b 1
+"%build_directory%\legacy_detect.exe" "%repository_root%\tests\fixtures\encodings\windows-1251-long-lf.txt" 1251 > "%build_directory%\result.txt"
+if errorlevel 1 exit /b 1
+findstr /X /C:"Charset: windows-1251" "%build_directory%\result.txt" >nul
+if not errorlevel 1 exit /b 1
 "%build_directory%\file_detect.exe" "%build_directory%\missing-file" >nul 2>&1
 if not errorlevel 1 exit /b 1
 echo Examples: build and checks passed
