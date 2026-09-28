@@ -4,15 +4,17 @@
 
 unit chsdet;
 
+{$warn 5023 off : no warning about unused units}
 interface
 
 uses
   Big5Freq, CharDistribution, CustomDetector, EUCKRFreq, EUCSampler,
-  EUCTWFreq, GB2312Freq, JISFreq, JpCntx, MBUnicodeMultiProber, 
-  MultiModelProber, nsCodingStateMachine, nsCore, nsEscCharsetProber, 
-  nsGroupProber, nsHebrewProber, nsLatin1Prober, nsMBCSMultiProber, nsPkg, 
-  nsSBCharSetProber, nsSBCSGroupProber, nsUniversalDetector, 
-  LangBulgarianModel, LangCyrillicModel, LangGreekModel, LangHebrewModel;
+  EUCTWFreq, GB2312Freq, JISFreq, JpCntx, MBUnicodeMultiProber,
+  MultiModelProber, nsCodingStateMachine, nsCore, nsEscCharsetProber,
+  nsGroupProber, nsHebrewProber, nsLatin1Prober, nsMBCSMultiProber, nsPkg,
+  nsSBCharSetProber, nsSBCSGroupProber, nsUniversalDetector,
+  LangBulgarianModel, LangCyrillicModel, LangGreekModel, LangHebrewModel,
+  CharsetBOM;
 
 implementation
 

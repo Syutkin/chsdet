@@ -47,9 +47,12 @@ type
     mCharSetProbers: array[0..Pred(NUM_OF_CHARSET_PROBERS)] of TCustomDetector;
     mEscCharSetProber: TCustomDetector;
     mDetectedBOM: eBOMKind;
+    mBOMBuffer: array[0..3] of AnsiChar;
+    mBOMLength: integer;
 
     procedure Report(aCharsetID: eInternalCharsetID);
-    function CheckBOM(aBuf: pAnsiChar; aLen: integer): integer;
+    procedure ResolveInitialBytes(aAtEnd: Boolean);
+    procedure ProcessData(aBuf: pAnsiChar; aLen: integer);
     function GetCharsetID(CodePage: integer): eInternalCharsetID;
     procedure DoEnableCharset(Charset: eInternalCharsetID; SetEnabledTo: Boolean);
   public
@@ -78,7 +81,8 @@ uses
   nsSBCSGroupProber,
   nsEscCharsetProber,
   nsLatin1Prober,
-  MBUnicodeMultiProber;
+  MBUnicodeMultiProber,
+  CharsetBOM;
 
 const
   MINIMUM_THRESHOLD: float = 0.20;
@@ -127,6 +131,9 @@ begin
     (* caller program sometimes call DataEnd before anything has been sent to detector*)
     exit;
 
+  if mStart then
+    ResolveInitialBytes(True);
+
   if mDetectedCharset <> UNKNOWN_CHARSET then
     begin
       mDone := TRUE;
@@ -168,36 +175,30 @@ end;
 function TnsUniversalDetector.HandleData(aBuf: pAnsiChar; aLen: integer): nsResult;
 var
   i: integer;
+begin
+  Result := NS_OK;
+  if mDone or (aLen <= 0) then
+    Exit;
+  mGotData := TRUE;
+
+  i := 0;
+  while mStart and (i < aLen) do
+    begin
+      mBOMBuffer[mBOMLength] := aBuf[i];
+      Inc(mBOMLength);
+      Inc(i);
+      ResolveInitialBytes(False);
+    end;
+
+  if not mDone and (i < aLen) then
+    ProcessData(@aBuf[i], aLen - i);
+end;
+
+procedure TnsUniversalDetector.ProcessData(aBuf: pAnsiChar; aLen: integer);
+var
+  i: integer;
   st: eProbingState;
 begin
-  if mDone then
-    begin
-      Result := NS_OK;
-      exit;
-    end;
-  if aLen > 0 then
-    mGotData := TRUE;
-
-  (*If the data starts with BOM, we know it is UTF*)
-  if mStart then
-    begin
-      mStart := FALSE;
-      if CheckBOM(aBuf, aLen) > 0 then
-      begin
-        case mDetectedBOM of
-          BOM_UTF8:      mDetectedCharset := UTF8_CHARSET;
-          BOM_UTF16_LE:  mDetectedCharset := UTF16_LE_CHARSET;
-          BOM_UTF16_BE:  mDetectedCharset := UTF16_BE_CHARSET;
-          BOM_UCS4_LE:   mDetectedCharset := UTF32_LE_CHARSET;
-          BOM_UCS4_BE:   mDetectedCharset := UTF32_BE_CHARSET;
-          BOM_UCS4_2143: mDetectedCharset := UCS4_LE_CHARSET;
-          BOM_UCS4_3412: mDetectedCharset := UCS4_BE_CHARSET
-        end;
-        mDone := TRUE;
-        Result := NS_OK;
-        Exit;
-      end;
-    end;                                {if mStart}
 
   for i := 0 to Pred(aLen) do
     (*other than 0xa0, if every othe character is ascii, the page is ascii*)
@@ -259,7 +260,6 @@ begin
       (*do nothing here*)
     end;
   end;                                  {case}
-  Result := NS_OK;
 end;
 
 procedure TnsUniversalDetector.Report(aCharsetID: eInternalCharsetID);
@@ -285,6 +285,7 @@ begin
   for i := 0 to Pred(NUM_OF_CHARSET_PROBERS) do
     mCharSetProbers[i].Reset;
   mDetectedBOM := BOM_Not_Found;
+  mBOMLength := 0;
 end;
 
 function TnsUniversalDetector.GetDetectedCharsetInfo: nsCore.rCharsetInfo;
@@ -309,31 +310,25 @@ begin
   About := AboutInfo;
 end;
 
-function TnsUniversalDetector.CheckBOM(aBuf: pAnsiChar; aLen: integer): integer;
-var
-  bom: eBOMKind;
-  i: integer;
-  same: Boolean;
+procedure TnsUniversalDetector.ResolveInitialBytes(aAtEnd: Boolean);
 begin
-  Result := 0;
-  mDetectedBOM := BOM_Not_Found;
-  for bom := Succ(low(eBOMKind)) to high(eBomKind) do
-    if aLen > KNOWN_BOM[bom].Length then
-      begin
-        same := true;
-        for i := 0 to KNOWN_BOM[bom].Length - 1 do
-          if (aBuf[i] <> KNOWN_BOM[bom].BOM[i]) then
-            begin
-              same := false;
-              break;
-            end;
-        if same then
-          begin
-            mDetectedBOM := bom;
-            Result := KNOWN_BOM[bom].Length;
-            exit;
-          end;
-      end;
+  if not ResolveCharsetBOM(@mBOMBuffer[0], mBOMLength, aAtEnd,
+    mDetectedBOM) then
+    Exit;
+  mStart := False;
+  case mDetectedBOM of
+    BOM_UTF8:      mDetectedCharset := UTF8_CHARSET;
+    BOM_UTF16_LE:  mDetectedCharset := UTF16_LE_CHARSET;
+    BOM_UTF16_BE:  mDetectedCharset := UTF16_BE_CHARSET;
+    BOM_UCS4_LE:   mDetectedCharset := UTF32_LE_CHARSET;
+    BOM_UCS4_BE:   mDetectedCharset := UTF32_BE_CHARSET;
+    BOM_UCS4_2143: mDetectedCharset := UCS4_LE_CHARSET;
+    BOM_UCS4_3412: mDetectedCharset := UCS4_BE_CHARSET;
+    BOM_Not_Found: ProcessData(@mBOMBuffer[0], mBOMLength);
+  end;
+  if mDetectedBOM <> BOM_Not_Found then
+    mDone := True;
+  mBOMLength := 0;
 end;
 
 procedure TnsUniversalDetector.DisableCharset(CodePage: integer);

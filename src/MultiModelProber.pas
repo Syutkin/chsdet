@@ -82,6 +82,8 @@ var
   j: integer;
   i: integer;
 begin
+  if mState <> psDetecting then
+    Exit(mState);
   {$IFDEF DEBUG_chardet}
    AddDump('Multi Model - HandleData - start');
   {$endif}
@@ -129,24 +131,9 @@ begin
         end; // if codingState = eError
     end;
 
-  if mActiveSM = 1 then
-    begin
-      for i := 0 to Pred(mCharsetsCount) do
-        if (mSMState[i] <> psNotMe) then
-          begin
-            // TODO - set confidience ? or....
-            //  signalised that it's not sure
-            if GetConfidence > SURE_NO then
-              begin
-                mSMState[i] := psFoundIt;
-                mState := psFoundIt;
-                mDetectedCharset := mCodingSM[i].GetCharsetID;
-                break;
-              end;
-          end;
-    end
-  else
-    Result := mState;
+  // A single remaining state machine has not necessarily recognized its
+  // charset. Only an explicit eItsMe transition is a positive answer.
+  Result := mState;
   {$IFDEF DEBUG_chardet}
    DumpStatus('Multi Model - HandleData - EXIT.');
   {$endif}
@@ -157,15 +144,20 @@ var
 	i: integer;
 begin
   mState:= psDetecting;
+  mActiveSM := 0;
   for i := 0 to Pred(mCharsetsCount) do
     begin
   	  mCodingSM[i].Reset;
       if mCodingSM[i].Enabled then
-        mSMState[i] := psDetecting
+        begin
+          mSMState[i] := psDetecting;
+          Inc(mActiveSM);
+        end
       else
         mSMState[i]  := psNotMe;
     end;
-  mActiveSM := mCharsetsCount;
+  if mActiveSM = 0 then
+    mState := psNotMe;
   mDetectedCharset := UNKNOWN_CHARSET;
 end;
 
@@ -185,26 +177,11 @@ end;
 
 
 function TMultiModelProber.GetConfidence: float;
-var
-  i: integer;
 begin
- 	Result := SURE_NO;
   case mState of
-    psNotMe:
-    	begin
-      	Result := SURE_NO;  
-        mDetectedCharset := UNKNOWN_CHARSET;
-      end;
-    else
-      for i := 0 to Pred(mCharsetsCount) do
-        if (mSMState[i] = psFoundIt) or
-           ((mSMState[i] = psDetecting) and (mActiveSM = 1)) then
-          begin
-            Result := SURE_YES;
-            mDetectedCharset := mCodingSM[i].GetCharsetID;
-            break;
-          end;
-  end;{case}
+    psFoundIt: Result := SURE_YES;
+    else Result := SURE_NO;
+  end;
 end;
 
 {$ifdef DEBUG_chardet}

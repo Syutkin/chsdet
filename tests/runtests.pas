@@ -7,7 +7,7 @@ uses
   cthreads,
   {$ENDIF}
   consoletestrunner,
-  ChsDetTests;
+  ChsDetTests, BOMTests, ProberStateTests;
 
 var
   App: TTestRunner;

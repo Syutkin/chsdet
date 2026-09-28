@@ -36,6 +36,7 @@ type
       mBestGuess: integer;
       mActiveNum: integer;
       mProberStates: array of eProbingState;
+      function FindBestGuess(out aConfidence: float): integer;
 
 		public
       constructor Create; override;
@@ -82,24 +83,25 @@ begin
 end;
 
 function TnsGroupProber.GetDetectedCharset: eInternalCharsetID;
+var
+  bestGuess: integer;
+  confidence: float;
 begin
-  (*if we have no answer yet*)
-  if mBestGuess = -1 then
-    begin
-      GetConfidence;
-      (*no charset seems positive*)
-      if mBestGuess = -1 then
-	      mBestGuess:= 0;
-      (*we will use default.*)
-    end;
-
-	Result := mProbers[mBestGuess].GetDetectedCharset;
+  bestGuess := mBestGuess;
+  if bestGuess < 0 then
+    bestGuess := FindBestGuess(confidence);
+  if bestGuess < 0 then
+    Result := UNKNOWN_CHARSET
+  else
+    Result := mProbers[bestGuess].GetDetectedCharset;
 end;
 
 function TnsGroupProber.HandleData(aBuf: pAnsiChar; aLen: integer): eProbingState;
 var
   i: integer;
 begin
+  if mState <> psDetecting then
+    Exit(mState);
   {$IFDEF DEBUG_chardet}
     AddDump('Group Prober - HandleData - start');
   {$endif}
@@ -165,43 +167,49 @@ begin
     mState := psNotMe;
 end;
 
-function TnsGroupProber.GetConfidence: float;
+function TnsGroupProber.FindBestGuess(out aConfidence: float): integer;
 var
   i: integer;
-  bestConf: float;
   cf: float;
 begin
-  bestConf := 0.0;
+  Result := -1;
+  aConfidence := 0.0;
+  for i := 0 to Pred(mNumOfProbers) do
+    begin
+      if not mIsActive[i] then
+        Continue;
+      cf := mProbers[i].GetConfidence;
+      if aConfidence < cf then
+        begin
+          aConfidence := cf;
+          Result := i;
+        end;
+    end;
+end;
+
+function TnsGroupProber.GetConfidence: float;
+var
+  confidence: float;
+begin
   case mState of
     psFoundIt:
       begin
-      	Result := SURE_YES;  (*sure yes*)
+        Result := SURE_YES;
         exit;
       end;
     psNotMe:
-    	begin
-      	Result := SURE_NO;  (*sure no*)
+      begin
+        Result := SURE_NO;
         exit;
       end;
     else
-      for i := 0 to Pred(mNumOfProbers) do
-        begin
-          if not mIsActive[i] then
-            continue;
-
-          cf := mProbers[i].GetConfidence;
-          if bestConf < cf then
-            begin
-              bestConf := cf;
-              mBestGuess := i;
-            end;
-        end;
-  end;{case}
+      FindBestGuess(confidence);
+  end;
   {$IFDEF DEBUG_chardet}
     DumpStatus('Group Prober - GetConfidience');
   {$endif}
 
-  Result := bestConf;
+  Result := confidence;
 end;
 
 function TnsGroupProber.EnableCharset(Charset: eInternalCharsetID; NewValue: Boolean): Boolean;
@@ -238,6 +246,4 @@ end;
 {$endif}
 
 end.
-
-
 

@@ -38,15 +38,16 @@ type
       mContextAnalysis: array of TJapaneseContextAnalysis;
       mLastChar: array of TLastChar;
       mKeepNext: Byte;
-      mBestGuess: integer;
 
       function RunStatAnalyse(aBuf: pAnsiChar; aLen: integer): eProbingState;
       function GetConfidenceFor(index: integer): double; reintroduce;
+      function FindBestGuess(out aConfidence: double): integer;
 		public
 			constructor Create; reintroduce;
       destructor Destroy; override;
 		  function HandleData(aBuf: pAnsiChar; aLen: integer): eProbingState; override;
       function GetConfidence: double; override;
+      function GetDetectedCharset: eInternalCharsetID; override;
       procedure Reset; override;
       {$ifdef DEBUG_chardet}
       procedure DumpStatus(Dump: string); override;
@@ -153,6 +154,8 @@ var
   highbyteBuf: pAnsiChar;
   hptr: pAnsiChar;
 begin
+  if mState <> psDetecting then
+    Exit(mState);
   highbyteBuf := AllocMem(aLen);
   try
     hptr:= highbyteBuf;
@@ -292,33 +295,55 @@ begin
     Result := distribCf;
 end;
 
-function TnsMBCSMultiProber.GetConfidence: double;
+function TnsMBCSMultiProber.FindBestGuess(out aConfidence: double): integer;
 var
   i: integer;
-  conf,
-  bestConf: double;
+  conf: double;
 begin
-  mBestGuess := -1;
-  bestConf := SURE_NO;
+  Result := -1;
+  aConfidence := SURE_NO;
   for i := 0 to Pred(mCharsetsCount) do
     begin
-      if (mSMState[i] = psFoundIt) or
-         (mSMState[i] = psNotMe) then
+      if not mCodingSM[i].Enabled or (mSMState[i] <> psDetecting) then
         continue;
       if mDistributionAnalysis[i] = nil then
         continue;
       conf := GetConfidenceFor(i);
-      if conf > bestConf then
+      if conf > aConfidence then
         begin
-          mBestGuess := i;
-          bestConf := conf;
+          Result := i;
+          aConfidence := conf;
         end;
     end;
-  Result := bestConf;
-  if mBestGuess > -1 then
-    mDetectedCharset := mCodingSM[mBestGuess].GetCharsetID
+end;
+
+function TnsMBCSMultiProber.GetConfidence: double;
+var
+  confidence: double;
+begin
+  case mState of
+    psFoundIt: Result := SURE_YES;
+    psNotMe: Result := SURE_NO;
+    else
+      begin
+        FindBestGuess(confidence);
+        Result := confidence;
+      end;
+  end;
+end;
+
+function TnsMBCSMultiProber.GetDetectedCharset: eInternalCharsetID;
+var
+  bestGuess: integer;
+  confidence: double;
+begin
+  if mState = psFoundIt then
+    Exit(inherited GetDetectedCharset);
+  bestGuess := FindBestGuess(confidence);
+  if bestGuess < 0 then
+    Result := UNKNOWN_CHARSET
   else
-    mDetectedCharset := UNKNOWN_CHARSET;
+    Result := mCodingSM[bestGuess].GetCharsetID;
 end;
 
 procedure TnsMBCSMultiProber.Reset;

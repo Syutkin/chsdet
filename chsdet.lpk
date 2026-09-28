@@ -27,7 +27,7 @@
 Given input buffer will be analysed to guess used encoding. The result can be used as control parameter for charset conversation procedure."/>
     <License Value="GNU LGPL-2.1"/>
     <Version Minor="2" Release="10"/>
-    <Files Count="45">
+    <Files Count="46">
       <Item1>
         <Filename Value="src\Big5Freq.pas"/>
         <UnitName Value="Big5Freq"/>
@@ -208,6 +208,10 @@ Given input buffer will be analysed to guess used encoding. The result can be us
         <Filename Value="src\stat\GB2312Statistics.inc"/>
         <Type Value="Include"/>
       </Item45>
+      <Item46>
+        <Filename Value="src\CharsetBOM.pas"/>
+        <UnitName Value="CharsetBOM"/>
+      </Item46>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>

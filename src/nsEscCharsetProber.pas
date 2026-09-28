@@ -97,6 +97,8 @@ function TnsEscCharSetProber.HandleData(aBuf: pAnsiChar;
 var
   i: Integer;
 begin
+  if mState <> psDetecting then
+    Exit(mState);
   for i := 0 to Pred(aLen) do
     begin
       if mIso2022CnSequenceLength < Length(mIso2022CnSequence) then
@@ -141,4 +143,3 @@ begin
 end;
 
 end.
-
