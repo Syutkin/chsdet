@@ -14,7 +14,8 @@ uses
   nsGroupProber, nsHebrewProber, nsLatin1Prober, nsMBCSMultiProber, nsPkg,
   nsSBCharSetProber, nsSBCSGroupProber, nsUniversalDetector,
   LangBulgarianModel, LangCyrillicModel, LangGreekModel, LangHebrewModel,
-  CharsetBOM, CharsetUTF8, CharsetUTF16, CharsetDetector;
+  CharsetBOM, CharsetUTF8, CharsetUTF16, CharsetDetector, CharsetByteValidity,
+  CharsetConfusion;
 
 implementation
 

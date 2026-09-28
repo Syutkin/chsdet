@@ -26,7 +26,9 @@ uses
   nsCore,
   CustomDetector,
   CharsetUTF8,
-  CharsetUTF16;
+  CharsetUTF16,
+  CharsetByteValidity,
+  CharsetConfusion;
 
 const
   NUM_OF_CHARSET_PROBERS = 4;
@@ -53,10 +55,14 @@ type
     mBOMLength: integer;
     mUTF8: TCharsetUTF8Validator;
     mUTF16: TCharsetUTF16Prober;
+    mSeenBytes: TCharsetSeenBytes;
+    mConfusion: TCharsetConfusion;
 
     procedure Report(aCharsetID: eInternalCharsetID);
     procedure ResolveInitialBytes(aAtEnd: Boolean);
     procedure ProcessData(aBuf: pAnsiChar; aLen: integer);
+    function BestValidModel: eInternalCharsetID;
+    procedure RefineStatisticalChoice;
     function GetCharsetID(CodePage: integer): eInternalCharsetID;
     procedure DoEnableCharset(Charset: eInternalCharsetID; SetEnabledTo: Boolean);
   public
@@ -134,6 +140,7 @@ var
   maxProber: int32;
   i: integer;
   utf16Charset: eInternalCharsetID;
+  proberCharset: eInternalCharsetID;
   utf8Ready: Boolean;
   asciiCandidate: Boolean;
 begin
@@ -152,6 +159,9 @@ begin
       mDone := TRUE;
       exit;
     end;
+
+  if not SingleByteCharsetCanDecode(mDetectedCharset, mSeenBytes) then
+    mDetectedCharset := UNKNOWN_CHARSET;
 
   asciiCandidate := mUTF8.IsASCII and not mUTF8.HasNUL;
   { Classify ASCII before UTF-8, but resolve UTF-16 structure before making
@@ -206,7 +216,15 @@ begin
           end;
         (*do not report anything because we are not confident of it, that's in fact a negative answer*)
         if maxProberConfidence > MINIMUM_THRESHOLD then
-          Report(mCharSetProbers[maxProber].GetDetectedCharset);
+          begin
+            proberCharset := mCharSetProbers[maxProber].GetDetectedCharset;
+            if SingleByteCharsetCanDecode(proberCharset, mSeenBytes) then
+              Report(proberCharset)
+            else
+              Report(BestValidModel);
+          end;
+        mConfusion.Finish;
+        RefineStatisticalChoice;
       end;
     isEscAscii:
       begin
@@ -222,6 +240,95 @@ begin
 {$IFDEF DEBUG_chardet}
   AddDump('Universal detector - DataEnd');
 {$ENDIF}
+end;
+
+procedure TnsUniversalDetector.RefineStatisticalChoice;
+var
+  pair: TConfusionPair;
+  decision: TConfusionDecision;
+  firstCharset, secondCharset: eInternalCharsetID;
+  firstScore, secondScore, otherScore: float;
+  scores: TCharsetModelScores;
+  i, j: integer;
+begin
+  for pair := Low(TConfusionPair) to High(TConfusionPair) do
+    begin
+      case pair of
+        cpGreek:
+          begin
+            firstCharset := WINDOWS_1253_CHARSET;
+            secondCharset := ISO_8859_7_CHARSET;
+          end;
+        cpCyrillic:
+          begin
+            firstCharset := WINDOWS_1251_CHARSET;
+            secondCharset := X_MAC_CYRILLIC_CHARSET;
+          end;
+      end;
+      if (mDetectedCharset <> firstCharset) and
+        (mDetectedCharset <> secondCharset) then
+        Continue;
+      decision := mConfusion.Decide(pair);
+      if decision = cdNoEvidence then
+        Continue;
+      firstScore := 0;
+      secondScore := 0;
+      otherScore := 0;
+      for i := 0 to 2 do
+        begin
+          scores := mCharSetProbers[i].GetModelScores;
+          for j := 0 to High(scores) do
+            begin
+              if (scores[j].State = psNotMe) or
+                not SingleByteCharsetCanDecode(scores[j].CharsetID,
+                  mSeenBytes) then
+                Continue;
+              if scores[j].CharsetID = firstCharset then
+                begin
+                  if scores[j].Confidence > firstScore then
+                    firstScore := scores[j].Confidence;
+                end
+              else if scores[j].CharsetID = secondCharset then
+                begin
+                  if scores[j].Confidence > secondScore then
+                    secondScore := scores[j].Confidence;
+                end
+              else if scores[j].Confidence > otherScore then
+                otherScore := scores[j].Confidence;
+            end;
+        end;
+      if (firstScore < MINIMUM_THRESHOLD) or
+        (secondScore < MINIMUM_THRESHOLD) or
+        (firstScore < otherScore) or (secondScore < otherScore) then
+        Continue;
+      if decision = cdFirst then
+        mDetectedCharset := firstCharset
+      else
+        mDetectedCharset := secondCharset;
+      Exit;
+    end;
+end;
+
+function TnsUniversalDetector.BestValidModel: eInternalCharsetID;
+var
+  scores: TCharsetModelScores;
+  bestConfidence: float;
+  i, j: integer;
+begin
+  Result := UNKNOWN_CHARSET;
+  bestConfidence := MINIMUM_THRESHOLD;
+  for i := 0 to 2 do
+    begin
+      scores := mCharSetProbers[i].GetModelScores;
+      for j := 0 to High(scores) do
+        if (scores[j].State <> psNotMe) and
+          (scores[j].Confidence > bestConfidence) and
+          SingleByteCharsetCanDecode(scores[j].CharsetID, mSeenBytes) then
+          begin
+            bestConfidence := scores[j].Confidence;
+            Result := scores[j].CharsetID;
+          end;
+    end;
 end;
 
 function TnsUniversalDetector.HandleData(aBuf: pAnsiChar; aLen: integer): nsResult;
@@ -250,31 +357,41 @@ procedure TnsUniversalDetector.ProcessData(aBuf: pAnsiChar; aLen: integer);
 var
   i: integer;
   st: eProbingState;
+  replayTilde: Boolean;
+  tilde: AnsiChar;
 begin
   mUTF8.Feed(aBuf, aLen);
   mUTF16.Feed(aBuf, aLen);
+  replayTilde := False;
 
   for i := 0 to Pred(aLen) do
-    if Byte(aBuf[i]) >= $80 then
-      begin
-        if mInputState <> isHighbyte then
-          begin
-            (*adjust state*)
-            mInputState := isHighbyte;
-          end;
-      end
-    else
-      begin
-        (*ok, just pure ascii so *)
-        if (mInputState = isPureAscii) and
-          ((aBuf[i] = #$1B) or
-          (aBuf[i] = '{') and
-          (mLastChar = '~')) then
-          (*found escape character or HZ "~{"*)
-          mInputState := isEscAscii;
+    begin
+      Include(mSeenBytes, Byte(aBuf[i]));
+      mConfusion.Feed(Byte(aBuf[i]));
+      if Byte(aBuf[i]) >= $80 then
+        begin
+          if mInputState <> isHighbyte then
+            begin
+              (*adjust state*)
+              mInputState := isHighbyte;
+            end;
+        end
+      else
+        begin
+          (*ok, just pure ascii so *)
+          if (mInputState = isPureAscii) and
+            ((aBuf[i] = #$1B) or
+            (aBuf[i] = '{') and
+            (mLastChar = '~')) then
+            begin
+              (* If "~{" crosses calls, the escape prober missed "~". *)
+              replayTilde := (i = 0) and (aBuf[i] = '{');
+              mInputState := isEscAscii;
+            end;
 
-        mLastChar := aBuf[i];
-      end;
+          mLastChar := aBuf[i];
+        end;
+    end;
 
   case mInputState of
     isEscAscii:
@@ -282,6 +399,11 @@ begin
 {$IFDEF DEBUG_chardet}
         AddDump('Universal detector - Escape Detector started');
 {$ENDIF}
+        if replayTilde then
+          begin
+            tilde := '~';
+            mEscCharSetProber.HandleData(@tilde, 1);
+          end;
         st := mEscCharSetProber.HandleData(aBuf, aLen);
         if st = psFoundIt then
           begin
@@ -329,6 +451,8 @@ begin
   mDone := FALSE;
   mStart := TRUE;
   mDetectedCharset := UNKNOWN_CHARSET;
+  mSeenBytes := [];
+  mConfusion.Reset;
   mGotData := FALSE;
   mInputState := isPureAscii;
   mLastChar := #0;                      (*illegal value as signal*)

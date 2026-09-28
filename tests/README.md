@@ -24,6 +24,11 @@ Pass normal FPCUnit console runner options to the script, for example:
 The runner executes all registered tests by default. Use `--suite` or `--list`
 to select a suite or inspect the registered tests.
 
+`TCharsetDetectionResult.Candidates` remains sorted by the original model
+confidence. When `Source = csConfusionResolution`, the result's `Charset` is
+selected by the distinguishing-byte context check and can be the second
+candidate. Its `Confidence` is that candidate's unchanged model score.
+
 ## Fixture policy and research mode
 
 The required suite contains 160 exact-label tests and four shared-Hebrew
@@ -69,6 +74,13 @@ Hebrew interpretation independently with Python 3 (standard library only):
 
 ```sh
 python3 tests/audit-fixtures.py --output tests/.test_build/fixture-audit.tsv
+```
+
+Regenerate the single-byte Unicode categories and distinguishing-byte maps
+used by the Greek and Cyrillic confusion check with:
+
+```sh
+python3 tests/generate-confusion-tables.py
 ```
 
 ## Windows cross-build on Linux

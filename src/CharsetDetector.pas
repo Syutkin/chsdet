@@ -14,7 +14,7 @@ type
   );
   TCharsetDetectionSource = (
     csNone, csBOM, csASCII, csUTF8Validation, csUTF16Structure,
-    csStatistics
+    csStatistics, csConfusionResolution
   );
   TCharsetCandidate = record
     Charset: string;
@@ -65,7 +65,7 @@ function DetectCharset(const Data: RawByteString): TCharsetDetectionResult;
 implementation
 
 uses
-  SysUtils;
+  SysUtils, CharsetByteValidity, CharsetConfusion;
 
 type
   TCharsetCoreDetector = class(TnsUniversalDetector)
@@ -73,11 +73,24 @@ type
     function ChosenCharset: eInternalCharsetID;
     function DecisionSource: TCharsetDetectionSource;
     function ModelScores: TCharsetModelScores;
+    function SeenBytes: TCharsetSeenBytes;
+    function ConfusionDecision(aPair: TConfusionPair): TConfusionDecision;
   end;
 
 function TCharsetCoreDetector.ChosenCharset: eInternalCharsetID;
 begin
   Result := mDetectedCharset;
+end;
+
+function TCharsetCoreDetector.SeenBytes: TCharsetSeenBytes;
+begin
+  Result := mSeenBytes;
+end;
+
+function TCharsetCoreDetector.ConfusionDecision(aPair: TConfusionPair):
+  TConfusionDecision;
+begin
+  Result := mConfusion.Decide(aPair);
 end;
 
 function TCharsetCoreDetector.DecisionSource: TCharsetDetectionSource;
@@ -206,6 +219,42 @@ begin
   Result := -1;
 end;
 
+function PreferredByContext(const aCandidates: TCharsetCandidates;
+  aCore: TCharsetCoreDetector): Integer;
+var
+  decision: TConfusionDecision;
+  firstIndex, secondIndex: Integer;
+  pair: TConfusionPair;
+  firstName, secondName: string;
+begin
+  Result := -1;
+  for pair := Low(TConfusionPair) to High(TConfusionPair) do
+    begin
+      case pair of
+        cpGreek:
+          begin
+            firstName := 'windows-1253';
+            secondName := 'ISO-8859-7';
+          end;
+        cpCyrillic:
+          begin
+            firstName := 'windows-1251';
+            secondName := 'x-mac-cyrillic';
+          end;
+      end;
+      firstIndex := CandidateIndex(aCandidates, firstName);
+      secondIndex := CandidateIndex(aCandidates, secondName);
+      if (firstIndex < 0) or (firstIndex > 1) or
+        (secondIndex < 0) or (secondIndex > 1) or
+        (aCandidates[firstIndex].Confidence < 0.20) or
+        (aCandidates[secondIndex].Confidence < 0.20) then
+        Continue;
+      decision := aCore.ConfusionDecision(pair);
+      if decision = cdFirst then Exit(firstIndex);
+      if decision = cdSecond then Exit(secondIndex);
+    end;
+end;
+
 constructor TCharsetDetector.Create;
 begin
   inherited Create;
@@ -284,7 +333,8 @@ var
   scores: TCharsetModelScores;
   source: TCharsetDetectionSource;
   chosen: eInternalCharsetID;
-  i, isoIndex, windowsIndex: Integer;
+  i, isoIndex, windowsIndex, preferredIndex: Integer;
+  seenBytes: TCharsetSeenBytes;
   hebrewConfidence: Double;
   sharedHebrew: Boolean;
 begin
@@ -315,19 +365,30 @@ begin
     end;
 
   scores := core.ModelScores;
+  seenBytes := core.SeenBytes;
   for i := 0 to High(scores) do
     if (scores[i].State <> psNotMe) and
-      (scores[i].Confidence > SURE_NO) then
+      (scores[i].Confidence > SURE_NO) and
+      SingleByteCharsetCanDecode(scores[i].CharsetID, seenBytes) then
       AddCandidate(Result.Candidates, scores[i].CharsetID,
         scores[i].Confidence, True, csStatistics);
   SortCandidates(Result.Candidates);
+  { Keep model scores and their order intact. Context may prefer the second
+    candidate; Result.Source records that separate decision. }
+  preferredIndex := -1;
+  if (FBytesSeen >= 4) and (Length(Result.Candidates) >= 2) then
+    preferredIndex := PreferredByContext(Result.Candidates, core);
   if Length(Result.Candidates) > 0 then
     begin
-      Result.Charset := Result.Candidates[0].Charset;
-      Result.CodePage := Result.Candidates[0].CodePage;
-      Result.Confidence := Result.Candidates[0].Confidence;
-      Result.HasConfidence := Result.Candidates[0].HasConfidence;
-      Result.Source := Result.Candidates[0].Source;
+      i := 0;
+      if preferredIndex >= 0 then i := preferredIndex;
+      Result.Charset := Result.Candidates[i].Charset;
+      Result.CodePage := Result.Candidates[i].CodePage;
+      Result.Confidence := Result.Candidates[i].Confidence;
+      Result.HasConfidence := Result.Candidates[i].HasConfidence;
+      Result.Source := Result.Candidates[i].Source;
+      if preferredIndex >= 0 then
+        Result.Source := csConfusionResolution;
     end;
   { A statistical guess from fewer than four bytes is insufficient evidence.
     Exact BOM and ASCII decisions above do not use this threshold. }
@@ -339,6 +400,12 @@ begin
   if (Length(Result.Candidates) = 0) or
     (Result.Candidates[0].Confidence < MinimumStatConfidence) then
     Exit;
+
+  if preferredIndex >= 0 then
+    begin
+      Result.Status := dsDetected;
+      Exit;
+    end;
 
   isoIndex := CandidateIndex(Result.Candidates, 'ISO-8859-8');
   windowsIndex := CandidateIndex(Result.Candidates, 'windows-1255');

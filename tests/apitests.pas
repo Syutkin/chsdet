@@ -8,7 +8,7 @@ implementation
 
 uses
   Classes, SysUtils, fpcunit, testregistry, nsCore, nsUniversalDetector,
-  CharsetDetector;
+  CharsetDetector, CharsetByteValidity;
 
 type
   TAPITests = class(TTestCase)
@@ -25,6 +25,11 @@ type
     procedure FixtureCorpusStreamingEquivalence;
     procedure CrossesInternalBlocks;
     procedure UniqueSortedCandidatesAndHebrewAmbiguity;
+    procedure SingleByteValidity;
+    procedure InvalidHebrewCandidatesAreExcluded;
+    procedure HebrewWithCombiningMarks;
+    procedure HZAcrossChunksAndPlainASCII;
+    procedure ConfusionResolutionUsesDistinguishingBytes;
     procedure FinishResetAndInvalidFeed;
     procedure ExistingDetectorRemainsUsable;
   end;
@@ -45,6 +50,154 @@ begin
   finally
     stream.Free;
   end;
+end;
+
+procedure TAPITests.SingleByteValidity;
+var
+  seen: TCharsetSeenBytes;
+begin
+  seen := [$DF];
+  AssertTrue(SingleByteCharsetCanDecode(ISO_8859_8_CHARSET, seen));
+  AssertFalse(SingleByteCharsetCanDecode(WINDOWS_1255_CHARSET, seen));
+
+  seen := [$C8];
+  AssertFalse(SingleByteCharsetCanDecode(ISO_8859_8_CHARSET, seen));
+  AssertTrue(SingleByteCharsetCanDecode(WINDOWS_1255_CHARSET, seen));
+
+  seen := [$A2];
+  AssertTrue(SingleByteCharsetCanDecode(ISO_8859_7_CHARSET, seen));
+  AssertTrue(SingleByteCharsetCanDecode(WINDOWS_1253_CHARSET, seen));
+
+  seen := [$AE];
+  AssertFalse(SingleByteCharsetCanDecode(ISO_8859_7_CHARSET, seen));
+  AssertTrue(SingleByteCharsetCanDecode(WINDOWS_1253_CHARSET, seen));
+
+  seen := [$AA];
+  AssertTrue(SingleByteCharsetCanDecode(ISO_8859_7_CHARSET, seen));
+  AssertFalse(SingleByteCharsetCanDecode(WINDOWS_1253_CHARSET, seen));
+
+  seen := [$98];
+  AssertFalse(SingleByteCharsetCanDecode(WINDOWS_1251_CHARSET, seen));
+  AssertFalse(SingleByteCharsetCanDecode(WINDOWS_BULGARIAN_CHARSET, seen));
+  AssertTrue(SingleByteCharsetCanDecode(X_MAC_CYRILLIC_CHARSET, seen));
+
+  seen := [$81];
+  AssertFalse(SingleByteCharsetCanDecode(WINDOWS_1252_CHARSET, seen));
+  AssertTrue(SingleByteCharsetCanDecode(KOI8_R_CHARSET, seen));
+end;
+
+procedure TAPITests.InvalidHebrewCandidatesAreExcluded;
+var
+  detected: TCharsetDetectionResult;
+begin
+  detected := DetectCharset(ReadFixture('iso-8859-8-lf.txt'));
+  AssertTrue(FindCandidate(detected, 'ISO-8859-8') >= 0);
+  AssertEquals(-1, FindCandidate(detected, 'windows-1255'));
+
+  detected := DetectCharset(ReadFixture('windows-1255-lf.txt'));
+  AssertTrue(FindCandidate(detected, 'windows-1255') >= 0);
+  AssertEquals(-1, FindCandidate(detected, 'ISO-8859-8'));
+
+  detected := DetectCharset(ReadFixture('iso-8859-8-shared-lf.txt'));
+  AssertEquals(Ord(dsAmbiguous), Ord(detected.Status));
+  AssertTrue(FindCandidate(detected, 'ISO-8859-8') >= 0);
+  AssertTrue(FindCandidate(detected, 'windows-1255') >= 0);
+end;
+
+procedure TAPITests.HebrewWithCombiningMarks;
+const
+  Names: array[0..3] of string = (
+    'windows-1255-lf.txt', 'windows-1255-crlf.txt',
+    'windows-1255-long-lf.txt', 'windows-1255-long-crlf.txt');
+var
+  detected: TCharsetDetectionResult;
+  name: string;
+begin
+  for name in Names do
+    begin
+      detected := DetectCharset(ReadFixture(name));
+      AssertEquals(name + ' status', Ord(dsDetected), Ord(detected.Status));
+      AssertEquals(name + ' charset', 'windows-1255', detected.Charset);
+      AssertTrue(name + ' confidence', detected.Confidence >= 0.20);
+      AssertEquals(name + ' ISO candidate', -1,
+        FindCandidate(detected, 'ISO-8859-8'));
+    end;
+end;
+
+procedure TAPITests.HZAcrossChunksAndPlainASCII;
+var
+  legacy: TnsUniversalDetector;
+  detector: TCharsetDetector;
+  data, plain: RawByteString;
+  expected, actual: TCharsetDetectionResult;
+  i: Integer;
+begin
+  data := '~{5<So~}';
+  plain := 'plain ~{ literal braces and symbols } text';
+  legacy := TnsUniversalDetector.Create;
+  detector := TCharsetDetector.Create;
+  try
+    for i := 0 to 1 do
+      begin
+        legacy.Reset;
+        if i = 0 then
+          legacy.HandleData(PAnsiChar(data), Length(data))
+        else
+          begin
+            legacy.HandleData(@data[1], 1);
+            legacy.HandleData(@data[2], Length(data) - 1);
+          end;
+        legacy.DataEnd;
+        AssertEquals('HZ across call boundary', 'HZ-GB-2312',
+          String(legacy.GetDetectedCharsetInfo.Name));
+      end;
+
+    expected := DetectCharset(data);
+    AssertEquals(Ord(dsDetected), Ord(expected.Status));
+    AssertEquals('HZ-GB-2312', expected.Charset);
+    for i := 1 to Length(data) do
+      detector.Feed(@data[i], 1);
+    actual := detector.Finish;
+    CheckEqual(expected, actual, 'HZ bytewise feed');
+
+    legacy.Reset;
+    legacy.HandleData(PAnsiChar(plain), Length(plain));
+    legacy.DataEnd;
+    AssertEquals('plain text with tilde and brace', 'ASCII',
+      String(legacy.GetDetectedCharsetInfo.Name));
+    AssertEquals('ASCII', DetectCharset(plain).Charset);
+  finally
+    detector.Free;
+    legacy.Free;
+  end;
+end;
+
+procedure TAPITests.ConfusionResolutionUsesDistinguishingBytes;
+var
+  detected: TCharsetDetectionResult;
+  candidateIndex: Integer;
+begin
+  detected := DetectCharset(ReadFixture('windows-1251-lf.txt'));
+  AssertEquals(Ord(dsDetected), Ord(detected.Status));
+  AssertEquals('windows-1251', detected.Charset);
+  AssertEquals(Ord(csConfusionResolution), Ord(detected.Source));
+  candidateIndex := FindCandidate(detected, detected.Charset);
+  AssertTrue(candidateIndex >= 0);
+  AssertTrue('raw model leader can differ from contextual choice',
+    candidateIndex > 0);
+  AssertTrue(Abs(detected.Confidence -
+    detected.Candidates[candidateIndex].Confidence) < 1e-12);
+
+  detected := DetectCharset(ReadFixture('windows-1253-lf.txt'));
+  AssertEquals(Ord(dsDetected), Ord(detected.Status));
+  AssertEquals('windows-1253', detected.Charset);
+  AssertEquals(Ord(csConfusionResolution), Ord(detected.Source));
+  AssertTrue(FindCandidate(detected, 'ISO-8859-7') >= 0);
+
+  detected := DetectCharset(ReadFixture('iso-8859-7-lf.txt'));
+  AssertEquals(Ord(dsAmbiguous), Ord(detected.Status));
+  AssertEquals(Ord(csStatistics), Ord(detected.Source));
+  AssertTrue(FindCandidate(detected, 'windows-1253') >= 0);
 end;
 
 function TAPITests.FindCandidate(const aResult: TCharsetDetectionResult;

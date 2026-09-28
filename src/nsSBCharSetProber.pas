@@ -90,6 +90,13 @@ const
   NEGATIVE_CAT = 0;
 {$endif}
 
+function IsWindows1255CombiningMark(aByte: Byte): Boolean;
+begin
+  { Combining Hebrew points do not represent letters. Skip them only when
+    scoring the Hebrew model so pairs of base letters remain adjacent. }
+  Result := (aByte in [$C0..$C9, $CB..$CD, $CF, $D1..$D2]);
+end;
+
 { TnsSingleByteCharSetProber }
 
 constructor TnsSingleByteCharSetProber.Create(model: SequenceModel;  reversed: Boolean = FALSE; nameProber: TCustomDetector = nil);
@@ -161,6 +168,9 @@ begin
 
   for i := 0 to Pred(aLen) do
     begin
+      if (mModel.CharsetID = WINDOWS_1255_CHARSET) and
+        IsWindows1255CombiningMark(Byte(aBuf[i])) then
+        Continue;
       order := byte(mModel.charToOrderMap[byte(aBuf[i])]);
       if order < SYMBOL_CAT_ORDER then
 	      inc(mTotalChar);

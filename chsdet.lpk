@@ -27,7 +27,7 @@
 Given input buffer will be analysed to guess used encoding. The result can be used as control parameter for charset conversation procedure."/>
     <License Value="GNU LGPL-2.1"/>
     <Version Minor="2" Release="10"/>
-    <Files Count="49">
+    <Files Count="52">
       <Item1>
         <Filename Value="src\Big5Freq.pas"/>
         <UnitName Value="Big5Freq"/>
@@ -224,6 +224,18 @@ Given input buffer will be analysed to guess used encoding. The result can be us
         <Filename Value="src\CharsetDetector.pas"/>
         <UnitName Value="CharsetDetector"/>
       </Item49>
+      <Item50>
+        <Filename Value="src\CharsetByteValidity.pas"/>
+        <UnitName Value="CharsetByteValidity"/>
+      </Item50>
+      <Item51>
+        <Filename Value="src\CharsetConfusion.pas"/>
+        <UnitName Value="CharsetConfusion"/>
+      </Item51>
+      <Item52>
+        <Filename Value="src\CharsetConfusionTables.inc"/>
+        <Type Value="Include"/>
+      </Item52>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>
