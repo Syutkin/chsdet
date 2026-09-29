@@ -7,8 +7,11 @@
   ranked candidates.
 - Added allowed charset profiles. An excluded BOM or validated Unicode result
   returns `dsExcludedByProfile` with the indicated encoding retained.
-- Added BOM-free UTF-16LE/BE checks, strict UTF-8 validation, a separate ASCII
-  result, byte-validity checks and context checks for close candidates.
+- Added BOM-free UTF-16LE/BE and UTF-32LE/BE checks, strict UTF-8 validation,
+  a separate ASCII result, byte-validity checks and context checks for close
+  candidates.
+- Added Windows-1250 detection in both APIs using byte-pair models and word
+  context, including support for allowed charset profiles.
 - Fixed detection across input blocks, extended CP932 pairs and legacy
   `DisableCharset` behavior.
 - Kept `TnsUniversalDetector` and its public methods. Corrected detection can
@@ -19,6 +22,8 @@
 BOM-free UTF-8 preference requires one complete non-ASCII character. A single
 valid sequence can also occur in legacy text, so short inputs can be
 misclassified. A BOM does not validate the rest of the input.
+
+Very sparse Windows-1250 text can be reported as Windows-1252.
 
 ## Verification
 
