@@ -82,6 +82,7 @@ type
     function ModelScores: TCharsetModelScores;
     function SeenBytes: TCharsetSeenBytes;
     function ConfusionDecision(aPair: TConfusionPair): TConfusionDecision;
+    function HebrewContextPrefersWestern: Boolean;
     procedure ConfigureAllowed(const aAllowed: TInternalCharsetSet);
   end;
 
@@ -120,6 +121,11 @@ function TCharsetCoreDetector.ConfusionDecision(aPair: TConfusionPair):
   TConfusionDecision;
 begin
   Result := mConfusion.Decide(aPair);
+end;
+
+function TCharsetCoreDetector.HebrewContextPrefersWestern: Boolean;
+begin
+  Result := mConfusion.PreferWesternOverHebrew;
 end;
 
 function TCharsetCoreDetector.DecisionSource: TCharsetDetectionSource;
@@ -411,10 +417,11 @@ var
   scores: TCharsetModelScores;
   source: TCharsetDetectionSource;
   chosen: eInternalCharsetID;
-  i, isoIndex, windowsIndex, preferredIndex: Integer;
+  i, isoIndex, windowsIndex, westernIndex, preferredIndex: Integer;
   seenBytes: TCharsetSeenBytes;
   hebrewConfidence: Double;
   sharedHebrew: Boolean;
+  westernHebrewPreference: Boolean;
 begin
   Result := Default(TCharsetDetectionResult);
   Result.Status := dsUnknown;
@@ -462,11 +469,31 @@ begin
       AddCandidate(Result.Candidates, scores[i].CharsetID,
         scores[i].Confidence, True, csStatistics);
   SortCandidates(Result.Candidates);
-  { Keep model scores and their order intact. Context may prefer the second
-    candidate; Result.Source records that separate decision. }
+  { Keep model scores and their order intact. Context may prefer a lower
+    ranked candidate; Result.Source records that separate decision. }
   preferredIndex := -1;
+  westernHebrewPreference := False;
   if (FBytesSeen >= 4) and (Length(Result.Candidates) >= 2) then
     preferredIndex := PreferredByContext(Result.Candidates, core);
+  { The Hebrew models can score one E9-E9 pair above Windows-1252 in a
+    mostly Latin document. A negative Hebrew-to-Latin pair in that same
+    word breaks the near tie. Keep all raw scores and retain ambiguity. }
+  if (preferredIndex < 0) and core.HebrewContextPrefersWestern and
+    (Length(Result.Candidates) >= 2) then
+    begin
+      isoIndex := CandidateIndex(Result.Candidates, 'ISO-8859-8');
+      windowsIndex := CandidateIndex(Result.Candidates, 'windows-1255');
+      westernIndex := CandidateIndex(Result.Candidates, 'windows-1252');
+      if (westernIndex >= 0) and
+        (Result.Candidates[westernIndex].Confidence >= MinimumStatConfidence) and
+        ((isoIndex = 0) or (windowsIndex = 0)) and
+        (Result.Candidates[0].Confidence -
+         Result.Candidates[westernIndex].Confidence <= AmbiguousGap) then
+        begin
+          preferredIndex := westernIndex;
+          westernHebrewPreference := True;
+        end;
+    end;
   if Length(Result.Candidates) > 0 then
     begin
       i := 0;
@@ -492,7 +519,10 @@ begin
 
   if preferredIndex >= 0 then
     begin
-      Result.Status := dsDetected;
+      if westernHebrewPreference then
+        Result.Status := dsAmbiguous
+      else
+        Result.Status := dsDetected;
       Exit;
     end;
 

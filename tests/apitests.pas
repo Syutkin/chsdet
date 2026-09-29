@@ -33,6 +33,7 @@ type
     procedure HZAcrossChunksAndPlainASCII;
     procedure LegacyGreekStreamingUsesAllModels;
     procedure LegacyWesternStreamingKeepsWordBoundaries;
+    procedure SparseWesternHebrewContext;
     procedure LegacyBulgarianModelCanChooseMacCyrillic;
     procedure CP932ExtensionBytesRemainValid;
     procedure GreekWordInitialLetterBeatsPunctuation;
@@ -252,6 +253,54 @@ begin
   for blockSize in BlockSizes do
     AssertEquals('block size ' + IntToStr(blockSize), 'windows-1252',
       DetectLegacyInBlocks(data, blockSize));
+end;
+
+procedure TAPITests.SparseWesternHebrewContext;
+const
+  BlockSizes: array[0..4] of Integer = (0, 1, 2, 7, 512);
+var
+  data, hebrewWord: RawByteString;
+  detected, streamed: TCharsetDetectionResult;
+  detector: TCharsetDetector;
+  blockSize, hebrewIndex, i: Integer;
+begin
+  data := '';
+  for i := 1 to 20 do
+    data := data + 'ordinary text about albums and songs. ';
+  data := data + 'One copy is on ' + #$E9#$E9'n album.' + #10;
+  detected := DetectCharset(data);
+  AssertEquals(Ord(dsAmbiguous), Ord(detected.Status));
+  AssertEquals('windows-1252', detected.Charset);
+  AssertEquals(Ord(csConfusionResolution), Ord(detected.Source));
+  hebrewIndex := FindCandidate(detected, 'windows-1255');
+  AssertTrue('Hebrew model scores remain visible', hebrewIndex >= 0);
+  AssertTrue('context can prefer the lower raw score',
+    detected.Confidence < detected.Candidates[hebrewIndex].Confidence);
+  for blockSize in BlockSizes do
+    AssertEquals('legacy block size ' + IntToStr(blockSize),
+      'windows-1252', DetectLegacyInBlocks(data, blockSize));
+
+  detector := TCharsetDetector.Create;
+  try
+    for i := 1 to Length(data) do
+      detector.Feed(@data[i], 1);
+    streamed := detector.Finish;
+    CheckEqual(detected, streamed, 'sparse Western bytewise');
+  finally
+    detector.Free;
+  end;
+
+  { A short genuine Hebrew word has two positive letter pairs. }
+  hebrewWord := #$E0#$E9#$EF;
+  AssertTrue('short Hebrew remains a Hebrew-family result',
+    DetectLegacyInBlocks(hebrewWord, 1) = 'windows-1255');
+  detected := DetectCharset(hebrewWord);
+  AssertTrue('short Hebrew keeps a Hebrew candidate',
+    (detected.Charset = 'windows-1255') or
+    (detected.Charset = 'ISO-8859-8'));
+  hebrewWord := 'prefix' + hebrewWord + 'suffix';
+  AssertEquals('mixed word with two positive Hebrew pairs',
+    'windows-1255', DetectLegacyInBlocks(hebrewWord, 1));
 end;
 
 procedure TAPITests.LegacyBulgarianModelCanChooseMacCyrillic;

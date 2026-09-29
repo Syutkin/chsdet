@@ -18,6 +18,11 @@ type
     FCategoryScore: array[TConfusionPair, 0..1] of LongInt;
     FBigramScore: array[TConfusionPair, 0..1] of LongInt;
     FDifferenceCount: array[TConfusionPair] of LongInt;
+    FHebrewWordCount: LongInt;
+    FHebrewWordOpen: Boolean;
+    FHebrewPositivePairs: LongInt;
+    FHebrewMixedNegativePairs: LongInt;
+    FHebrewOtherHighByte: Boolean;
     procedure ScorePosition(aByte: Byte; aHasBefore: Boolean;
       aBefore: Byte; aHasAfter: Boolean; aAfter: Byte);
     procedure ScoreBigram(aBefore, aAfter: Byte);
@@ -26,12 +31,13 @@ type
     procedure Feed(aByte: Byte);
     procedure Finish;
     function Decide(aPair: TConfusionPair): TConfusionDecision;
+    function PreferWesternOverHebrew: Boolean;
   end;
 
 implementation
 
 uses
-  nsSBCharSetProber, LangGreekModel, LangCyrillicModel;
+  nsSBCharSetProber, LangGreekModel, LangCyrillicModel, LangHebrewModel;
 
 {$I CharsetConfusionTables.inc}
 
@@ -66,6 +72,17 @@ end;
 function IsLetter(aCategory: Byte): Boolean;
 begin
   Result := aCategory in [2..4];
+end;
+
+function IsAsciiLetter(aByte: Byte): Boolean;
+begin
+  Result := (aByte in [Ord('A')..Ord('Z')]) or
+    (aByte in [Ord('a')..Ord('z')]);
+end;
+
+function IsHebrewLetter(aByte: Byte): Boolean;
+begin
+  Result := aByte in [$E0..$FA];
 end;
 
 function CategoryVote(aCurrent, aBefore, aAfter: Byte): LongInt;
@@ -160,18 +177,61 @@ begin
 end;
 
 procedure TCharsetConfusion.Feed(aByte: Byte);
+var
+  previousOrder, currentOrder, category: Byte;
 begin
   if FFinished or (FCount >= EvidenceCap) then
     Exit;
+  if (aByte >= $80) and not IsHebrewLetter(aByte) then
+    FHebrewOtherHighByte := True;
+  if IsHebrewLetter(aByte) then
+    begin
+      if not FHebrewWordOpen then
+        begin
+          Inc(FHebrewWordCount);
+          FHebrewWordOpen := True;
+        end;
+    end
+  else if not IsAsciiLetter(aByte) then
+    FHebrewWordOpen := False;
   if FCount > 0 then
     begin
       ScorePosition(FPrevious, FCount > 1, FBeforePrevious,
         True, aByte);
       ScoreBigram(FPrevious, aByte);
+      { In sparse Western text, bytes such as E9 E9 can form one positive
+        Hebrew pair even though the next Latin letter makes the same word
+        unlikely as Hebrew (E9 E9 n in Dutch "een" with accents). Record
+        that mixed-script negative pair separately from the model score. }
+      if (IsHebrewLetter(FPrevious) or IsHebrewLetter(aByte)) and
+        (IsHebrewLetter(FPrevious) or IsAsciiLetter(FPrevious)) and
+        (IsHebrewLetter(aByte) or IsAsciiLetter(aByte)) then
+        begin
+          previousOrder := Byte(Win1255Model.charToOrderMap[FPrevious]);
+          currentOrder := Byte(Win1255Model.charToOrderMap[aByte]);
+          if (previousOrder < 64) and (currentOrder < 64) then
+            begin
+              category := Byte(Win1255Model.precedenceMatrix[
+                previousOrder * 64 + currentOrder]);
+              if category = 3 then
+                Inc(FHebrewPositivePairs)
+              else if (category = 0) and
+                (IsHebrewLetter(FPrevious) <> IsHebrewLetter(aByte)) then
+                Inc(FHebrewMixedNegativePairs);
+            end;
+        end;
     end;
   FBeforePrevious := FPrevious;
   FPrevious := aByte;
   Inc(FCount);
+end;
+
+function TCharsetConfusion.PreferWesternOverHebrew: Boolean;
+begin
+  { This only supplies context for a close Western candidate. A genuine
+    short Hebrew word with two positive pairs must not be demoted. }
+  Result := not FHebrewOtherHighByte and (FHebrewWordCount = 1) and
+    (FHebrewPositivePairs <= 1) and (FHebrewMixedNegativePairs > 0);
 end;
 
 procedure TCharsetConfusion.Finish;

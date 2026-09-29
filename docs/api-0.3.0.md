@@ -108,7 +108,10 @@ input bytes. `Finish` sets `IsFinal = True`. Empty input returns
    candidate. A statistical choice requires at least four bytes and a score
    of at least `0.20`.
 5. A score gap of `0.05` or less produces `dsAmbiguous` unless context around
-   distinguishing bytes resolves the pair.
+   distinguishing bytes resolves the pair. Sparse Hebrew-like bytes inside a
+   Latin word can prefer Windows-1252 while retaining `dsAmbiguous`; in that
+   case `Charset` is the preferred candidate and `Source` is
+   `csConfusionResolution`.
 
 ## Profiles
 

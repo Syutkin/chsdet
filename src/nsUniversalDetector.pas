@@ -250,6 +250,7 @@ var
   decision: TConfusionDecision;
   firstCharset, firstAlias, secondCharset: eInternalCharsetID;
   firstScore, secondScore, otherScore: float;
+  hebrewScore, westernScore: float;
   scores: TCharsetModelScores;
   i, j: integer;
 begin
@@ -321,6 +322,36 @@ begin
         end;
       Exit;
     end;
+  { Sparse Western text can contain a pair such as E9 E9 that looks Hebrew.
+    If its following Latin letter is a negative Hebrew pair and the raw
+    Western score is close, prefer the coherent Latin word. This is a
+    contextual choice; the model's lower Western score is unchanged. }
+  if not mConfusion.PreferWesternOverHebrew or
+    not (mDetectedCharset in [WINDOWS_1255_CHARSET,
+      ISO_8859_8_CHARSET]) then
+    Exit;
+  hebrewScore := 0;
+  westernScore := 0;
+  for i := 0 to 2 do
+    begin
+      scores := mCharSetProbers[i].GetModelScores;
+      for j := 0 to High(scores) do
+        if (scores[j].State <> psNotMe) and
+          SingleByteCharsetCanDecode(scores[j].CharsetID, mSeenBytes) then
+          begin
+            if scores[j].CharsetID in [WINDOWS_1255_CHARSET,
+              ISO_8859_8_CHARSET] then
+              if scores[j].Confidence > hebrewScore then
+                hebrewScore := scores[j].Confidence;
+            if scores[j].CharsetID = WINDOWS_1252_CHARSET then
+              westernScore := scores[j].Confidence;
+          end;
+    end;
+  if (hebrewScore >= MINIMUM_THRESHOLD) and
+    (westernScore >= MINIMUM_THRESHOLD) and
+    (hebrewScore >= westernScore) and
+    (hebrewScore - westernScore <= 0.05) then
+    mDetectedCharset := WINDOWS_1252_CHARSET;
 end;
 
 function TnsUniversalDetector.BestValidModel: eInternalCharsetID;
@@ -444,7 +475,9 @@ begin
   else
     (*pure ascii*)
     begin
-      (*do nothing here*)
+      { Keep the Western model's ASCII context across calls. Otherwise it
+        sees only the tail beginning with the first high byte. }
+      mCharSetProbers[2].HandleData(aBuf, aLen);
     end;
   end;                                  {case}
 end;
