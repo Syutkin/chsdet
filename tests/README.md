@@ -11,7 +11,7 @@ options such as `--suite` and `--list` are forwarded to the runner.
 
 ## Fixtures
 
-All 216 encoding fixtures require an exact charset label and BOM result.
+All 224 encoding fixtures require an exact charset label and BOM result.
 Local `tests/baseline/` reports are ignored by Git.
 
 ## Reports and audits

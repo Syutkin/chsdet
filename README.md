@@ -79,8 +79,8 @@ code page `-1` and is not a supported encoding.
 | 1253 | windows-1253 | Statistical |
 | 1255 | windows-1255 | Statistical |
 | 10007 | x-mac-cyrillic | Statistical |
-| 12000 | UTF-32LE | BOM |
-| 12001 | UTF-32BE | BOM |
+| 12000 | UTF-32LE | BOM or structure |
+| 12001 | UTF-32BE | BOM or structure |
 | 20866 | KOI8-R | Statistical |
 | 28595 | ISO-8859-5 | Statistical |
 | 28597 | ISO-8859-7 | Statistical |

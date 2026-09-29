@@ -14,7 +14,7 @@ type
   );
   TCharsetDetectionSource = (
     csNone, csBOM, csASCII, csUTF8Validation, csUTF16Structure,
-    csStatistics, csConfusionResolution
+    csStatistics, csConfusionResolution, csUTF32Structure
   );
   TCharsetCandidate = record
     Charset: string;
@@ -133,6 +133,9 @@ begin
   Result := csNone;
   if mDetectedBOM <> BOM_Not_Found then
     Result := csBOM
+  else if (mDetectedCharset = UTF32_LE_CHARSET) or
+    (mDetectedCharset = UTF32_BE_CHARSET) then
+    Result := csUTF32Structure
   else if (mDetectedCharset = UTF16_LE_CHARSET) or
     (mDetectedCharset = UTF16_BE_CHARSET) then
     begin
@@ -439,7 +442,8 @@ begin
   chosen := core.ChosenCharset;
   source := core.DecisionSource;
   if (chosen <> UNKNOWN_CHARSET) and
-    (source in [csBOM, csASCII, csUTF8Validation, csUTF16Structure]) and
+    (source in [csBOM, csASCII, csUTF8Validation, csUTF16Structure,
+      csUTF32Structure]) and
     not IsAllowed(chosen) then
     begin
       Result.Status := dsExcludedByProfile;
@@ -448,7 +452,8 @@ begin
       Result.Source := source;
       Exit;
     end;
-  if (source in [csBOM, csASCII, csUTF8Validation, csUTF16Structure]) and
+  if (source in [csBOM, csASCII, csUTF8Validation, csUTF16Structure,
+    csUTF32Structure]) and
     (chosen <> UNKNOWN_CHARSET) then
     begin
       Result.Status := dsDetected;

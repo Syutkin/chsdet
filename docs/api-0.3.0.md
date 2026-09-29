@@ -41,7 +41,7 @@ type
   );
   TCharsetDetectionSource = (
     csNone, csBOM, csASCII, csUTF8Validation, csUTF16Structure,
-    csStatistics, csConfusionResolution
+    csStatistics, csConfusionResolution, csUTF32Structure
   );
   TCharsetCandidate = record
     Charset: string;
@@ -98,9 +98,11 @@ input bytes. `Finish` sets `IsFinal = True`. Empty input returns
 
 1. A BOM takes priority. It identifies an intended encoding but does not
    validate the remaining bytes.
-2. Without a BOM, UTF-16LE/BE structure is checked before ASCII. Escape
-   sequences are checked before plain ASCII is final. ASCII is reported
-   separately from UTF-8.
+2. Without a BOM, UTF-32LE/BE and then UTF-16LE/BE structure are checked
+   before ASCII. BOM-free UTF-32 requires at least four code points, a
+   consistent byte order, valid scalars throughout the input, and sufficient
+   printable text in the first 500 code points. Escape sequences are checked
+   before plain ASCII is final. ASCII is reported separately from UTF-8.
 3. BOM-free UTF-8 must validate across the complete input. One complete
    non-ASCII character is enough to prefer it over legacy encodings.
 4. Statistical candidates with undefined input bytes are excluded for the

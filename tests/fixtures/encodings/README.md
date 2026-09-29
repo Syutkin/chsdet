@@ -1,6 +1,6 @@
 # Encoding fixtures
 
-The 216 fixtures cover every public charset name. Each encoding has short and
+The 224 fixtures cover every public charset name. Each encoding has short and
 long, LF and CRLF variants. Every fixture must match its exact charset label
 and BOM result. The files are marked as binary in `.gitattributes` so Git does
 not change their bytes or line endings.
@@ -24,7 +24,8 @@ The UTF-8, UTF-16LE and UTF-16BE groups contain all five languages with the
 suffixes `ru`, `en`, `fr`, `el` and `he`. Each language has short and long,
 LF and CRLF, BOM and no-BOM variants. UTF-16 without a BOM is expected to be
 recognized in its exact byte order. UTF-32LE and UTF-32BE use mixed-language
-text and always have a BOM.
+text with and without a BOM. Both forms must be recognized in their exact byte
+order.
 
 `tests/audit-fixtures.py` verifies decoding, line endings and hashes. It uses
 Python standard codecs and `iconv` for EUC-TW and ISO-2022-CN.

@@ -27,11 +27,17 @@ def audit(root):
             "iso-2022-cn": "ISO-2022-CN", "hz-gb-2312": "hz",
             "koi8-r": "koi8_r", "ascii": "ascii",
             "utf-16le": "utf-16-le", "utf-16be": "utf-16-be",
-            "utf-32le": "utf-32", "utf-32be": "utf-32",
+            "utf-32le": "utf-32-le", "utf-32be": "utf-32-be",
             "utf-8": "utf-8",
         }
         codec = next(value for key, value in codecs.items()
                      if stem.startswith(key + "-"))
+        if stem.startswith(("utf-32le-", "utf-32be-")):
+            expected_bom = (b"\xff\xfe\x00\x00" if stem.startswith("utf-32le-")
+                            else b"\x00\x00\xfe\xff")
+            has_bom = data.startswith(expected_bom)
+            if has_bom != ("-bom-" in stem):
+                raise ValueError(f"Wrong UTF-32 BOM: {stem}")
         if codec in ("EUC-TW", "ISO-2022-CN"):
             decoded = subprocess.run(
                 ["iconv", "-f", codec, "-t", "UTF-8"],

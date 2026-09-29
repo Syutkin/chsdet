@@ -15,7 +15,7 @@ uses
   nsSBCharSetProber, nsSBCSGroupProber, nsUniversalDetector,
   LangBulgarianModel, LangCyrillicModel, LangGreekModel, LangHebrewModel,
   CharsetBOM, CharsetUTF8, CharsetUTF16, CharsetDetector, CharsetByteValidity,
-  CharsetConfusion;
+  CharsetConfusion, CharsetUTF32;
 
 implementation
 

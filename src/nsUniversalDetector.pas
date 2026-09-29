@@ -26,6 +26,7 @@ uses
   nsCore,
   CustomDetector,
   CharsetUTF8,
+  CharsetUTF32,
   CharsetUTF16,
   CharsetByteValidity,
   CharsetConfusion;
@@ -54,6 +55,7 @@ type
     mBOMBuffer: array[0..3] of AnsiChar;
     mBOMLength: integer;
     mUTF8: TCharsetUTF8Validator;
+    mUTF32: TCharsetUTF32Prober;
     mUTF16: TCharsetUTF16Prober;
     mSeenBytes: TCharsetSeenBytes;
     mConfusion: TCharsetConfusion;
@@ -115,6 +117,7 @@ begin
   mCharSetProbers[3] := TMBUnicodeMultiProber.Create;
   mEscCharSetProber := TnsEscCharSetProber.Create;
   mUTF8 := TCharsetUTF8Validator.Create;
+  mUTF32 := TCharsetUTF32Prober.Create;
   mUTF16 := TCharsetUTF16Prober.Create;
   Reset;
 end;
@@ -128,6 +131,7 @@ begin
 
   mEscCharSetProber.Free;
   mUTF8.Free;
+  mUTF32.Free;
   mUTF16.Free;
 
   inherited;
@@ -139,7 +143,7 @@ var
   maxProberConfidence: float;
   maxProber: int32;
   i: integer;
-  utf16Charset: eInternalCharsetID;
+  utf32Charset, utf16Charset: eInternalCharsetID;
   proberCharset: eInternalCharsetID;
   utf8Ready: Boolean;
   asciiCandidate: Boolean;
@@ -164,6 +168,13 @@ begin
     mDetectedCharset := UNKNOWN_CHARSET;
 
   asciiCandidate := mUTF8.IsASCII and not mUTF8.HasNUL;
+  utf32Charset := mUTF32.Detect;
+  if utf32Charset <> UNKNOWN_CHARSET then
+    begin
+      mDetectedCharset := utf32Charset;
+      mDone := True;
+      Exit;
+    end;
   { Classify ASCII before UTF-8, but resolve UTF-16 structure before making
     the ASCII result final: UTF-16 can also contain only low-byte values. }
   utf16Charset := mUTF16.Detect;
@@ -406,6 +417,7 @@ var
   tilde: AnsiChar;
 begin
   mUTF8.Feed(aBuf, aLen);
+  mUTF32.Feed(aBuf, aLen);
   mUTF16.Feed(aBuf, aLen);
   replayTilde := False;
 
@@ -509,6 +521,7 @@ begin
   mDetectedBOM := BOM_Not_Found;
   mBOMLength := 0;
   mUTF8.Reset;
+  mUTF32.Reset;
   mUTF16.Reset;
 end;
 

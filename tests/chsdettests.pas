@@ -195,7 +195,9 @@ begin
   AddTextVariants(Result, 'iso-2022-kr', 'ISO-2022-KR');
   AddTextVariants(Result, 'iso-2022-cn', 'ISO-2022-CN');
   AddTextVariants(Result, 'hz-gb-2312', 'HZ-GB-2312');
+  AddTextVariants(Result, 'utf-32le', 'UTF-32LE');
   AddBomVariants(Result, 'utf-32le', 'UTF-32LE', BOM_UCS4_LE);
+  AddTextVariants(Result, 'utf-32be', 'UTF-32BE');
   AddBomVariants(Result, 'utf-32be', 'UTF-32BE', BOM_UCS4_BE);
 
   AddUtfVariants(Result, 'ru');
