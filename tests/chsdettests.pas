@@ -7,7 +7,8 @@ interface
 implementation
 
 uses
-  Classes, SysUtils, TypInfo, fpcunit, testregistry, nsCore, nsUniversalDetector;
+  Classes, SysUtils, TypInfo, fpcunit, testregistry, nsCore,
+  nsUniversalDetector, CharsetDetector;
 
 type
   TChsDetFixtureTest = class(TTestCase)
@@ -15,7 +16,8 @@ type
     FExpectedBom: eBOMKind;
     FExpectedCharset: string;
     FFileName: string;
-    function DetectFixture(out ADetectedBom: eBOMKind): string;
+    function DetectFixture(out ADetectedBom: eBOMKind;
+      out AContent: RawByteString): string;
     function FixturePath: string;
     procedure ReportFixture(const AInfo: rCharsetInfo; const ABom: eBOMKind;
       const ADone: Boolean; const AAbout: rAboutHolder);
@@ -69,10 +71,9 @@ begin
     DirectorySeparator + 'encodings' + DirectorySeparator + FFileName);
 end;
 
-function TChsDetFixtureTest.DetectFixture(
-  out ADetectedBom: eBOMKind): string;
+function TChsDetFixtureTest.DetectFixture(out ADetectedBom: eBOMKind;
+  out AContent: RawByteString): string;
 var
-  content: rawbytestring;
   detector: TnsUniversalDetector;
   fixtureFile: string;
   fixtureStream: TFileStream;
@@ -82,20 +83,20 @@ begin
   fixtureFile := FixturePath;
   AssertTrue('Missing fixture: ' + fixtureFile, FileExists(fixtureFile));
 
-  content := '';
+  AContent := '';
   fixtureStream := TFileStream.Create(fixtureFile,
     fmOpenRead or fmShareDenyWrite);
   try
-    SetLength(content, fixtureStream.Size);
-    if content <> '' then
-      fixtureStream.ReadBuffer(content[1], Length(content));
+    SetLength(AContent, fixtureStream.Size);
+    if AContent <> '' then
+      fixtureStream.ReadBuffer(AContent[1], Length(AContent));
   finally
     fixtureStream.Free;
   end;
 
   detector := TnsUniversalDetector.Create;
   try
-    detector.HandleData(PAnsiChar(content), Length(content));
+    detector.HandleData(PAnsiChar(AContent), Length(AContent));
     if not detector.Done then
       detector.DataEnd;
     info := detector.GetDetectedCharsetInfo;
@@ -112,12 +113,20 @@ procedure TChsDetFixtureTest.RunTest;
 var
   detectedBom: eBOMKind;
   detectedCharset: string;
+  content: RawByteString;
+  detected: TCharsetDetectionResult;
 begin
-  detectedCharset := DetectFixture(detectedBom);
+  detectedCharset := DetectFixture(detectedBom, content);
   AssertEquals(FFileName + ': unexpected charset',
     LowerCase(FExpectedCharset), LowerCase(detectedCharset));
   AssertEquals(FFileName + ': unexpected BOM', Ord(FExpectedBom),
     Ord(detectedBom));
+
+  detected := DetectCharset(content);
+  AssertEquals(FFileName + ': unexpected new API charset',
+    LowerCase(FExpectedCharset), LowerCase(detected.Charset));
+  AssertEquals(FFileName + ': unexpected new API BOM', Ord(FExpectedBom),
+    Ord(detected.BOM));
 end;
 
 procedure AddFixture(ASuite: TTestSuite; const AFileName,
