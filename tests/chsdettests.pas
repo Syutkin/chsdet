@@ -183,6 +183,11 @@ begin
 
   AddTextVariants(Result, 'ascii', 'ASCII');
   AddTextVariants(Result, 'windows-1251', 'windows-1251');
+  AddTextVariants(Result, 'windows-1250', 'windows-1250');
+  AddTextVariants(Result, 'windows-1250-cs', 'windows-1250');
+  AddTextVariants(Result, 'windows-1250-hu', 'windows-1250');
+  AddTextVariants(Result, 'windows-1250-hr', 'windows-1250');
+  AddTextVariants(Result, 'windows-1250-sl', 'windows-1250');
   AddTextVariants(Result, 'windows-1252', 'windows-1252');
   AddTextVariants(Result, 'windows-1253', 'windows-1253');
   AddTextVariants(Result, 'windows-1255', 'windows-1255');

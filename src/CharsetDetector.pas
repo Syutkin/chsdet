@@ -96,14 +96,15 @@ begin
       if mCharSetProbers[0] is TMultiModelProber then
         TMultiModelProber(mCharSetProbers[0]).EnableCharset(charset,
           charset in aAllowed);
-      if mCharSetProbers[3] is TMultiModelProber then
-        TMultiModelProber(mCharSetProbers[3]).EnableCharset(charset,
+      if mCharSetProbers[4] is TMultiModelProber then
+        TMultiModelProber(mCharSetProbers[4]).EnableCharset(charset,
           charset in aAllowed);
       TMultiModelProber(mEscCharSetProber).EnableCharset(charset,
         charset in aAllowed);
     end;
   TnsSBCSGroupProber(mCharSetProbers[1]).ConfigureAllowed(aAllowed);
   mCharSetProbers[2].Enabled := WINDOWS_1252_CHARSET in aAllowed;
+  mCharSetProbers[3].Enabled := WINDOWS_1250_CHARSET in aAllowed;
   Reset;
 end;
 
@@ -170,7 +171,7 @@ begin
   if mInputState <> isHighbyte then
     Exit;
   { The old UTF-8 state machine is superseded by CharsetUTF8. }
-  for i := 0 to 2 do
+  for i := 0 to 3 do
     begin
       part := mCharSetProbers[i].GetModelScores;
       first := Length(Result);

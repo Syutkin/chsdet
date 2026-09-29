@@ -10,6 +10,8 @@
   decisions.
 - BOM-free UTF-16LE/BE checks, strict UTF-8 validation, separate ASCII
   results and byte-validity checks.
+- Windows-1250 detection in both APIs using byte-pair models and word context,
+  with support for allowed charset profiles.
 - Standalone examples, API reference and migration guide.
 
 ### Fixed

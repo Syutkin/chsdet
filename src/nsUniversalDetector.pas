@@ -32,7 +32,7 @@ uses
   CharsetConfusion;
 
 const
-  NUM_OF_CHARSET_PROBERS = 4;
+  NUM_OF_CHARSET_PROBERS = 5;
 
 type
   eInputState = (
@@ -92,6 +92,7 @@ uses
   nsSBCSGroupProber,
   nsEscCharsetProber,
   nsLatin1Prober,
+  CharsetWindows1250,
   MultiModelProber,
   MBUnicodeMultiProber,
   CharsetBOM;
@@ -114,7 +115,8 @@ begin
   mCharSetProbers[0] := TnsMBCSMultiProber.Create;
   mCharSetProbers[1] := TnsSBCSGroupProber.Create;
   mCharSetProbers[2] := TnsLatin1Prober.Create;
-  mCharSetProbers[3] := TMBUnicodeMultiProber.Create;
+  mCharSetProbers[3] := TWindows1250Prober.Create;
+  mCharSetProbers[4] := TMBUnicodeMultiProber.Create;
   mEscCharSetProber := TnsEscCharSetProber.Create;
   mUTF8 := TCharsetUTF8Validator.Create;
   mUTF32 := TCharsetUTF32Prober.Create;
@@ -211,14 +213,17 @@ begin
   case mInputState of
     isHighbyte:
       begin
-        TnsLatin1Prober(mCharSetProbers[2]).FinishData;
+        if mCharSetProbers[2] is TnsLatin1Prober then
+          TnsLatin1Prober(mCharSetProbers[2]).FinishData;
+        if mCharSetProbers[3] is TWindows1250Prober then
+          TWindows1250Prober(mCharSetProbers[3]).FinishData;
         maxProberConfidence := 0.0;
         maxProber := 0;
         for i := 0 to Pred(NUM_OF_CHARSET_PROBERS) do
           begin
             if not mCharSetProbers[i].Enabled then
               Continue;
-            if (i = 3) and not utf8Ready then
+            if (i = 4) and not utf8Ready then
               Continue;
             proberConfidence := mCharSetProbers[i].GetConfidence;
             if proberConfidence > maxProberConfidence then
@@ -290,7 +295,7 @@ begin
       firstScore := 0;
       secondScore := 0;
       otherScore := 0;
-      for i := 0 to 2 do
+      for i := 0 to 3 do
         begin
           scores := mCharSetProbers[i].GetModelScores;
           for j := 0 to High(scores) do
@@ -343,7 +348,7 @@ begin
     Exit;
   hebrewScore := 0;
   westernScore := 0;
-  for i := 0 to 2 do
+  for i := 0 to 3 do
     begin
       scores := mCharSetProbers[i].GetModelScores;
       for j := 0 to High(scores) do
@@ -373,7 +378,7 @@ var
 begin
   Result := UNKNOWN_CHARSET;
   bestConfidence := MINIMUM_THRESHOLD;
-  for i := 0 to 2 do
+  for i := 0 to 3 do
     begin
       scores := mCharSetProbers[i].GetModelScores;
       for j := 0 to High(scores) do
@@ -490,6 +495,7 @@ begin
       { Keep the Western model's ASCII context across calls. Otherwise it
         sees only the tail beginning with the first high byte. }
       mCharSetProbers[2].HandleData(aBuf, aLen);
+      mCharSetProbers[3].HandleData(aBuf, aLen);
     end;
   end;                                  {case}
 end;
@@ -604,6 +610,8 @@ begin
     end;
   if Charset = WINDOWS_1252_CHARSET then
     mCharSetProbers[2].Enabled := SetEnabledTo;
+  if Charset = WINDOWS_1250_CHARSET then
+    mCharSetProbers[3].Enabled := SetEnabledTo;
   TMultiModelProber(mEscCharSetProber).EnableCharset(Charset, SetEnabledTo);
   Reset;
 end;

@@ -11,7 +11,7 @@ options such as `--suite` and `--list` are forwarded to the runner.
 
 ## Fixtures
 
-All 224 encoding fixtures require an exact charset label and BOM result from
+All 244 encoding fixtures require an exact charset label and BOM result from
 both the legacy and new APIs. The new API is also checked for identical results
 with different input block sizes.
 Local `tests/baseline/` reports are ignored by Git.

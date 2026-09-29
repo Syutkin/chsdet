@@ -29,6 +29,7 @@ const
      $FB, $FC, $FF];
   Windows1251Undefined: TCharsetSeenBytes = [$98];
   Windows1252Undefined: TCharsetSeenBytes = [$81, $8D, $8F, $90, $9D];
+  Windows1250Undefined: TCharsetSeenBytes = [$81, $83, $88, $90, $98];
 begin
   case aCharset of
     ISO_8859_7_CHARSET:
@@ -43,6 +44,8 @@ begin
       Result := (aSeenBytes * Windows1251Undefined) = [];
     WINDOWS_1252_CHARSET:
       Result := (aSeenBytes * Windows1252Undefined) = [];
+    WINDOWS_1250_CHARSET:
+      Result := (aSeenBytes * Windows1250Undefined) = [];
     else
       { The remaining supported single-byte codecs map all 256 bytes.
         Multi-byte encodings are checked by their existing state machines. }

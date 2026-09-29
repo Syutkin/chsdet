@@ -129,6 +129,12 @@ begin
   seen := [$81];
   AssertFalse(SingleByteCharsetCanDecode(WINDOWS_1252_CHARSET, seen));
   AssertTrue(SingleByteCharsetCanDecode(KOI8_R_CHARSET, seen));
+
+  seen := [$8D];
+  AssertTrue(SingleByteCharsetCanDecode(WINDOWS_1250_CHARSET, seen));
+  AssertFalse(SingleByteCharsetCanDecode(WINDOWS_1252_CHARSET, seen));
+  seen := [$83];
+  AssertFalse(SingleByteCharsetCanDecode(WINDOWS_1250_CHARSET, seen));
 end;
 
 procedure TAPITests.InvalidHebrewCandidatesAreExcluded;
@@ -603,10 +609,10 @@ end;
 
 procedure TAPITests.StreamingEqualsOneShot;
 const
-  Files: array[0..5] of string = (
+  Files: array[0..6] of string = (
     'ascii-lf.txt', 'utf-8-ru-lf.txt', 'utf-16le-fr-crlf.txt',
     'utf-16be-he-lf.txt', 'windows-1251-lf.txt',
-    'iso-8859-8-lf.txt');
+    'iso-8859-8-lf.txt', 'windows-1250-long-lf.txt');
 var
   detector: TCharsetDetector;
   data: RawByteString;
@@ -788,6 +794,14 @@ begin
     limited := detector.Finish;
     AssertTrue(FindCandidate(limited, 'windows-1255') >= 0);
     AssertEquals(-1, FindCandidate(limited, 'ISO-8859-8'));
+
+    detector.Reset;
+    data := ReadFixture('windows-1250-long-lf.txt');
+    detector.SetAllowedCharsets(['windows-1250']);
+    detector.Feed(Pointer(data), Length(data));
+    limited := detector.Finish;
+    AssertEquals('windows-1250', limited.Charset);
+    AssertEquals(1, Length(limited.Candidates));
   finally
     detector.Free;
   end;
@@ -876,6 +890,17 @@ begin
     detector.DataEnd;
     AssertTrue('both Russian and Bulgarian CP1251 models are disabled',
       String(detector.GetDetectedCharsetInfo.Name) <> 'windows-1251');
+  finally
+    detector.Free;
+  end;
+  data := ReadFixture('windows-1250-long-lf.txt');
+  detector := TnsUniversalDetector.Create;
+  try
+    detector.DisableCharset(1250);
+    detector.HandleData(PAnsiChar(data), Length(data));
+    detector.DataEnd;
+    AssertTrue('CP1250 prober is disabled',
+      String(detector.GetDetectedCharsetInfo.Name) <> 'windows-1250');
   finally
     detector.Free;
   end;

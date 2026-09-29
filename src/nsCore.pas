@@ -125,7 +125,8 @@ type
     SHIFT_JIS_CHARSET,
     GB18030_CHARSET,
     HZ_GB_2312_CHARSET,
-    WINDOWS_1252_CHARSET
+    WINDOWS_1252_CHARSET,
+    WINDOWS_1250_CHARSET
   );
 
   TInternalCharsetSet = set of eInternalCharsetID;
@@ -318,6 +319,12 @@ const
       Name:  'windows-1252';
       CodePage:  1252;
       Language:  'eu';
+    ),
+  // WINDOWS_1250_CHARSET
+    (
+      Name:  'windows-1250';
+      CodePage:  1250;
+      Language:  'Central European';
     )
 
   );

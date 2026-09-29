@@ -15,7 +15,8 @@ def audit(root):
         data = path.read_bytes()
         stem = path.name
         codecs = {
-            "windows-1251": "cp1251", "windows-1252": "cp1252",
+            "windows-1250": "cp1250", "windows-1251": "cp1251",
+            "windows-1252": "cp1252",
             "windows-1253": "cp1253", "windows-1255": "cp1255",
             "iso-8859-5": "iso8859_5", "iso-8859-7": "iso8859_7",
             "iso-8859-8": "iso8859_8", "ibm866": "cp866",

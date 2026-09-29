@@ -74,6 +74,7 @@ code page `-1` and is not a supported encoding.
 | 950 | Big5 | Statistical |
 | 1200 | UTF-16LE | BOM or structure |
 | 1201 | UTF-16BE | BOM or structure |
+| 1250 | windows-1250 | Statistical and word context |
 | 1251 | windows-1251 | Statistical |
 | 1252 | windows-1252 | Statistical |
 | 1253 | windows-1253 | Statistical |
@@ -95,6 +96,13 @@ code page `-1` and is not a supported encoding.
 | 54936 | GB18030 | Statistical |
 | 65001 | UTF-8 | BOM or validation |
 
+Windows-1250 uses byte pair profiles and word context. Very sparse text may
+still be reported as windows-1252. The bundled CP1250 and CP1252 profiles are
+derived from chardet 7 under 0BSD; see
+[LICENSES/0BSD.txt](LICENSES/0BSD.txt). To regenerate the Pascal tables from
+the pinned source revision, run
+`python3 tests/generate-windows1250-models.py /path/to/chardet`.
+
 ## Build and test
 
 From the repository root with FPC 3.2.2:
@@ -113,5 +121,6 @@ cross-builds.
 
 ChsDet is distributed under the GNU Lesser General Public License; see
 [LICENCE](LICENCE). The Unicode data notice is in
-[UNICODE-LICENSE](UNICODE-LICENSE). Changes in this version are listed in the
-[changelog](CHANGELOG.md) and [release notes](docs/release-notes-0.3.0.md).
+[Unicode-3.0.txt](LICENSES/Unicode-3.0.txt). Changes in this version are
+listed in the [changelog](CHANGELOG.md) and
+[release notes](docs/release-notes-0.3.0.md).
