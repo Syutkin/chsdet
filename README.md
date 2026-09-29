@@ -10,9 +10,12 @@ status; it does not convert the input.
 ## State
 
 Version 0.3.0.
+
 Copyright (C) 2026 Andrey Syutkin
+
 The current source and tests are in
 [this repository](https://github.com/Syutkin/chsdet).
+
 The legacy `TnsUniversalDetector` API remains available alongside the new result and
 streaming API.
 
@@ -112,10 +115,13 @@ cross-builds.
 
 ## License
 
-ChsDet is distributed under the GNU Lesser General Public License; see
-[LICENCE](LICENCE).
+ChsDet is distributed under the GNU Lesser General Public License;
+see [LICENCE](LICENCE).
+
 The Unicode data notice is in [Unicode-3.0.txt](LICENSES/Unicode-3.0.txt).
-The bundled CP1250 and CP1252 profiles are derived from chardet 7 under 0BSD; see [LICENSES/0BSD.txt](LICENSES/0BSD.txt).
+
+The bundled CP1250 and CP1252 profiles are derived from chardet 7 under 0BSD;
+see [0BSD.txt](LICENSES/0BSD.txt).
 
 ## Changes
 Changes in this version are listed in the [changelog](CHANGELOG.md) and [release notes](docs/release-notes-0.3.0.md).
