@@ -1,7 +1,36 @@
-# ChsDet 0.3.0
+# ChsDet
 
-ChsDet detects the likely character encoding of raw bytes. It reports an
-encoding name and status; it does not decode the input.
+## Summary
+
+ChsDet is a standalone Free Pascal/Lazarus component that estimates the
+character encoding of raw text bytes. Applications can use its result to
+choose a decoder for multilingual text. ChsDet reports an encoding name and
+status; it does not convert the input.
+
+## State
+
+Version 0.3.0.
+Copyright (C) 2026 Andrey Syutkin
+The current source and tests are in
+[this repository](https://github.com/Syutkin/chsdet).
+The legacy `TnsUniversalDetector` API remains available alongside the new result and
+streaming API.
+
+## Original
+
+Based on:
+
+- Mozilla's i18n component,
+  [universalchardet](https://dxr.mozilla.org/mozilla/source/extensions/universalchardet/).
+- The [Double Commander component](https://github.com/doublecmd/doublecmd/tree/master/components/chsdet).
+  Copyright (C) 2011–2019 Alexander Koblov.
+- The [original Charset Detector](http://chsdet.sourceforge.net).
+  Copyright (C) 2006–2013 Nikolaj Yakowlew.
+
+## Requirements
+
+The detector needs no external components or LCL runtime. The Lazarus
+package depends only on FCL. Build and test instructions below use FPC 3.2.2.
 
 ## Use
 
@@ -76,20 +105,13 @@ lazbuild --ws=qt6 chsdet.lpk
 ```
 
 The test runner also builds and checks the examples. On Windows use
-`tests\run-tests.cmd --format=plain --sparse`. The package needs no LCL
-runtime dependency; standalone FPC clients add `src/` and `src/sbseq/` to
-their unit search path. See [test instructions](tests/README.md) for fixture
-audits and Win64 cross-builds.
+`tests\run-tests.cmd --format=plain --sparse`. See
+[test instructions](tests/README.md) for fixture audits and Win64
+cross-builds.
 
-## Origin and license
-
-The detector derives from Mozilla's universalchardet, the original chsdet
-project by Nikolaj Yakowlew, and the Double Commander component by Alexander
-Koblov. The 0.3.0 API and detection changes were developed in this repository.
-Generated confusion tables identify their source in
-`src/CharsetConfusionTables.inc`. The Unicode data notice is in
-[UNICODE-LICENSE](UNICODE-LICENSE).
+## License
 
 ChsDet is distributed under the GNU Lesser General Public License; see
-[LICENCE](LICENCE). Changes in this version are listed in the
+[LICENCE](LICENCE). The Unicode data notice is in
+[UNICODE-LICENSE](UNICODE-LICENSE). Changes in this version are listed in the
 [changelog](CHANGELOG.md) and [release notes](docs/release-notes-0.3.0.md).
